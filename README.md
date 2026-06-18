@@ -1,4 +1,4 @@
-# synder-importer (Claude Code plugin)
+# gl-importer (Claude Code plugin)
 
 Import CSV/XLSX accounting data into QuickBooks Online or Xero via the
 [Synder Importer API](https://importer.synder.com/apidocs).
@@ -6,13 +6,13 @@ Import CSV/XLSX accounting data into QuickBooks Online or Xero via the
 This plugin bundles:
 
 - An **MCP server** wrapping the Synder Importer REST API (`/api/v1`) — full read + write.
-- The `synder-importer` and `gl-importer` **agent skills** with natural-language guidance.
+- The `gl-importer` **agent skill** with natural-language guidance.
 
 ## Status
 
-**v0.1.0 — scaffold.** Plugin layout, manifest, skills, and a no-op MCP server.
+**v0.1.0 — scaffold.** Plugin layout, manifest, skill, and a no-op MCP server.
 Tool implementation lands in `feat/http-client-and-read-tools` (see
-[plans/synder-importer-mcp-plan-2026-06-18.md](plans/synder-importer-mcp-plan-2026-06-18.md)).
+[plans/gl-importer-mcp-plan-2026-06-18.md](plans/gl-importer-mcp-plan-2026-06-18.md)).
 
 ## Requirements
 
@@ -24,8 +24,8 @@ Tool implementation lands in `feat/http-client-and-read-tools` (see
 ## Local install (development)
 
 ```bash
-git clone https://github.com/SynderAccounting/synder-importer-plugin
-cd synder-importer-plugin
+git clone https://github.com/SynderAccounting/gl-importer-plugin
+cd gl-importer-plugin
 npm install
 npm run build
 claude --plugin-dir .
@@ -34,8 +34,8 @@ claude --plugin-dir .
 ## Marketplace install (once published)
 
 ```
-/plugin marketplace add SynderAccounting/synder-importer-plugin
-/plugin install synder-importer
+/plugin marketplace add SynderAccounting/gl-importer-plugin
+/plugin install gl-importer
 ```
 
 ## Configuration
@@ -51,5 +51,5 @@ MIT — see [LICENSE](LICENSE).
 
 ## Support
 
-- Issues: https://github.com/SynderAccounting/synder-importer-plugin/issues
+- Issues: https://github.com/SynderAccounting/gl-importer-plugin/issues
 - Email: support@synder.com

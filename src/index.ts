@@ -3,7 +3,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const SERVER_NAME = "synder-importer";
+const SERVER_NAME = "gl-importer";
 const SERVER_VERSION = "0.1.0";
 
 const server = new Server(
@@ -20,7 +20,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => ({
   content: [
     {
       type: "text",
-      text: `Tool "${request.params.name}" is not yet implemented. The synder-importer MCP server is at scaffold stage (v${SERVER_VERSION}). See plans/synder-importer-mcp-plan-2026-06-18.md.`,
+      text: `Tool "${request.params.name}" is not yet implemented. The gl-importer MCP server is at scaffold stage (v${SERVER_VERSION}). See plans/gl-importer-mcp-plan-2026-06-18.md.`,
     },
   ],
 }));
@@ -31,6 +31,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  process.stderr.write(`synder-importer MCP server fatal error: ${err}\n`);
+  process.stderr.write(`gl-importer MCP server fatal error: ${err}\n`);
   process.exit(1);
 });

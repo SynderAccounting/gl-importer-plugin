@@ -10,21 +10,21 @@
 
 ## 1. Goal
 
-Ship a Claude Code plugin called `synder-importer` that:
+Ship a Claude Code plugin called `gl-importer` that:
 
 1. Bundles an **MCP server** wrapping the public Synder Importer REST API (`https://importer.synder.com/api/v1`).
-2. Bundles the existing **agent skills** (`synder-importer`, `gl-importer`) so the LLM gets both natural-language guidance *and* deterministic tool calls.
+2. Bundles the existing **agent skill** `gl-importer` so the LLM gets both natural-language guidance *and* deterministic tool calls.
 3. Is distributable via the **Claude Code community marketplace** (`claude-plugins-community`) and `npm`.
 
-End state: a developer using Claude Code installs `synder-importer` from the marketplace, exports `IMPORTER_API_TOKEN`, and can say "import `invoices.csv` into my QuickBooks company" — Claude auto-discovers the company, auto-maps fields, runs the import, polls for completion, and reports results.
+End state: a developer using Claude Code installs `gl-importer` from the marketplace, exports `IMPORTER_API_TOKEN`, and can say "import `invoices.csv` into my QuickBooks company" — Claude auto-discovers the company, auto-maps fields, runs the import, polls for completion, and reports results.
 
 ## 2. Locked premises (Michael, 2026-06-18)
 
 | # | Decision | Rationale |
 |---|---|---|
-| 1 | New local repo at `~/Documents/projects/synder-importer-plugin/` → eventually `SynderAccounting/synder-importer-plugin` on GitHub | Separate lifecycle from the b-imports Grails monolith; npm-publishable; cleaner marketplace listing. |
+| 1 | New local repo at `~/Documents/projects/gl-importer-plugin/` → eventually `SynderAccounting/gl-importer-plugin` on GitHub | Separate lifecycle from the b-imports Grails monolith; npm-publishable; cleaner marketplace listing. |
 | 2 | MCP over **stdio**, distributed as **npm package** | Zero hosted infra; users invoke via `npx`. Standard Claude plugin pattern. |
-| 3 | **ONE plugin** with a single merged skill (`synder-importer`) + MCP server | gl-importer was 95% duplicate of synder-importer (same API, same endpoints). Merged unique lines into synder-importer, dropped the duplicate. One skill = less context for the LLM, simpler maintenance. |
+| 3 | **ONE plugin** with a single skill (`gl-importer`) + MCP server | synder-importer was 95% duplicate of gl-importer (same API, same endpoints). Michael picked `gl-importer` as canonical 2026-06-18. One skill = less context for the LLM, simpler maintenance. |
 | 4 | **TypeScript** + `@modelcontextprotocol/sdk`, Node 18+, `tsc` to `dist/` | Canonical MCP SDK. Long-term maintainability. |
 | 5 | **Full write from day 0** — no read-only mode, no confirm gates, no destructive-op flags | Customer's `IMPORTER_API_TOKEN` scope is the trust boundary. Trust the model. |
 | 6 | **Public from day 0** | Listed in `claude-plugins-community` once approved. |
@@ -33,7 +33,7 @@ End state: a developer using Claude Code installs `synder-importer` from the mar
 ## 3. Repo layout
 
 ```
-synder-importer-plugin/
+gl-importer-plugin/
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest
 ├── .mcp.json                    # MCP server registration
@@ -55,15 +55,15 @@ synder-importer-plugin/
 │   ├── schema.ts                # zod schemas for tool inputs
 │   └── errors.ts                # Maps REST error codes → MCP error responses
 ├── skills/
-│   └── synder-importer/
-│       ├── SKILL.md             # merged from b-imports synder-importer + gl-importer
+│   └── gl-importer/
+│       ├── SKILL.md             # from b-imports gl-importer (synder-importer dropped — 95% duplicate)
 │       └── references/
 │           └── api.md
 ├── test/
 │   ├── unit/                    # vitest, mocked HTTP
 │   └── integration/             # nock recordings + opt-in live tests
 ├── plans/
-│   └── synder-importer-mcp-plan-2026-06-18.md  ← this file
+│   └── gl-importer-mcp-plan-2026-06-18.md  ← this file
 └── dist/                        # gitignored, built via npm prepublishOnly
 ```
 
@@ -72,7 +72,7 @@ synder-importer-plugin/
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
-  "name": "synder-importer",
+  "name": "gl-importer",
   "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API. Bundles MCP server + agent skill.",
   "version": "0.1.0",
   "author": {
@@ -80,7 +80,7 @@ synder-importer-plugin/
     "email": "support@synder.com"
   },
   "homepage": "https://importer.synder.com",
-  "repository": "https://github.com/SynderAccounting/synder-importer-plugin",
+  "repository": "https://github.com/SynderAccounting/gl-importer-plugin",
   "license": "MIT",
   "keywords": ["synder", "importer", "quickbooks", "xero", "accounting", "csv", "mcp"]
 }
@@ -91,7 +91,7 @@ synder-importer-plugin/
 ```json
 {
   "mcpServers": {
-    "synder-importer": {
+    "gl-importer": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
       "env": {
@@ -133,7 +133,7 @@ Notes:
 | `import_revert` | POST /companies/{cid}/imports/{iid}/revert | Undo finished import |
 | `import_results` | GET /companies/{cid}/imports/{iid}/results | Per-row results (filterable) |
 
-Tool names shortened from `company_settings_get` → `settings_get` and `entity_fields_get` → `fields_get` — the company context is already scoped by `companyId` arg, and MCP namespaces tools by server (`synder-importer.settings_get`) which is already long.
+Tool names shortened from `company_settings_get` → `settings_get` and `entity_fields_get` → `fields_get` — the company context is already scoped by `companyId` arg, and MCP namespaces tools by server (`gl-importer.settings_get`) which is already long.
 
 ### Composite (happy-path)
 
@@ -188,9 +188,9 @@ This pattern: `{code} ({httpStatus}): {message}. {hint for next step}`. Hints co
 ### Observability
 
 The MCP server logs to **stderr** (stdout is reserved for MCP protocol). Logged on every API call:
-- `[synder-importer] GET /companies → 200 (142ms)`
-- `[synder-importer] POST /companies/9/imports/auto → 429 (retry 1/3, waiting 2s)`
-- `[synder-importer] ERROR: IMPORTER_API_TOKEN not set — all tool calls will fail`
+- `[gl-importer] GET /companies → 200 (142ms)`
+- `[gl-importer] POST /companies/9/imports/auto → 429 (retry 1/3, waiting 2s)`
+- `[gl-importer] ERROR: IMPORTER_API_TOKEN not set — all tool calls will fail`
 
 On startup, calls `GET /account` to validate the token. If it fails: logs error to stderr, does NOT crash — but every subsequent tool call returns `UNAUTHORIZED: Set IMPORTER_API_TOKEN env var. Generate at importer.synder.com → Account → API Keys.`
 
@@ -242,7 +242,7 @@ No sandbox environment exists for the Importer API — Michael confirmed 2026-06
   1. Create npm org (free tier, public). Try names in order: `synder` → `synderaccounting` → `synder-io` → `synder-tech`.
   2. Generate an automation token, save as GitHub secret `NPM_TOKEN`.
   3. Add VasilySynderBot (or shared bot account) as Developer.
-  4. Create empty GitHub repo `SynderAccounting/synder-importer-plugin`.
+  4. Create empty GitHub repo `SynderAccounting/gl-importer-plugin`.
   Once scope is registered, update `package.json#name` → `@<scope>/importer-mcp` and `plugin.json#repository`.
 - **Test account.** Not happening — no sandbox of prod. Live-API integration tests dropped; replaced with mock-only CI tests + manual dogfood smoke tests. See §9.
 - **`import_wait` long-imports.** Confirmed: default 600s timeout, return `{status: "POLLING", importId, lastSeen}` so LLM re-calls.
@@ -250,10 +250,10 @@ No sandbox environment exists for the Importer API — Michael confirmed 2026-06
 ## 12. Still open
 
 1. **License.** MIT assumed (standard for SDKs); confirm with legal if anyone files an issue requesting Apache-2.0 patent grant.
-2. ~~**Two skills, one plugin.**~~ **RESOLVED:** Merged into one skill. gl-importer dropped — 95% duplicate, unique lines merged into synder-importer.
+2. ~~**Two skills, one plugin.**~~ **RESOLVED:** Merged into one skill. synder-importer dropped (95% duplicate of gl-importer); kept `gl-importer` per Michael 2026-06-18.
 3. ~~**Composite tools — too magical?**~~ **RESOLVED:** `import_csv` (renamed from `import_csv_smart`) now returns dry-run mapping first, requires re-call with `confirmed: true` to proceed. Natural pause point for user confirmation without being a gate. Progress markers still included (`stage` field).
 4. **Idempotency keys.** Server-generated UUID per `import_execute` call. Means re-running the same MCP tool call creates a new import. If we want true idempotency from the LLM's POV, expose `idempotencyKey?: string` arg.
-5. **Marketplace co-hosting.** Plugin lives in `synder-importer-plugin` repo. Does the marketplace.json live there too (single-plugin marketplace) or in a separate `synder-marketplace` for future multi-plugin growth? Recommend single-plugin marketplace co-located for v0.1; split if/when we ship a second plugin.
+5. **Marketplace co-hosting.** Plugin lives in `gl-importer-plugin` repo. Does the marketplace.json live there too (single-plugin marketplace) or in a separate `synder-marketplace` for future multi-plugin growth? Recommend single-plugin marketplace co-located for v0.1; split if/when we ship a second plugin.
 
 ## 13. Launch plan
 
@@ -271,7 +271,7 @@ Review run 2026-06-18 (inline, CEO + Eng + DX phases, design skipped — no UI s
 
 ### CEO review — verdict: REVISE (4 items)
 - **C1** `import_csv` now returns dry-run before importing → applied to §6
-- **C2** gl-importer dropped, merged into synder-importer → applied to §2, §3, §12
+- **C2** synder-importer dropped (Michael picked `gl-importer` as canonical) → applied to §2, §3, §12
 - **C3** Launch plan added → new §13
 - **C4** Observability (stderr logging + startup token validation) → applied to §6
 
@@ -293,7 +293,7 @@ Review run 2026-06-18 (inline, CEO + Eng + DX phases, design skipped — no UI s
 
 ```
 Session goal: implement PR 1 (HTTP client + auth) and PR 2 (read-only tools — account_get, companies_list, entities_list, entity_fields_get, mappings_list, imports_list, import_status, import_results).
-Repo: ~/Documents/projects/synder-importer-plugin/
+Repo: ~/Documents/projects/gl-importer-plugin/
 Branch: feat/http-client-and-read-tools
 Done definition:
   - npm test passes

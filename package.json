@@ -1,11 +1,11 @@
 {
-  "name": "synder-importer-mcp",
+  "name": "gl-importer-mcp",
   "version": "0.1.0",
   "description": "MCP server for the Synder Importer REST API. Imports CSV/XLSX accounting data into QuickBooks Online or Xero.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "synder-importer-mcp": "dist/index.js"
+    "gl-importer-mcp": "dist/index.js"
   },
   "files": [
     "dist",
@@ -37,10 +37,10 @@
   "homepage": "https://importer.synder.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynderAccounting/synder-importer-plugin.git"
+    "url": "https://github.com/SynderAccounting/gl-importer-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/SynderAccounting/synder-importer-plugin/issues"
+    "url": "https://github.com/SynderAccounting/gl-importer-plugin/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
