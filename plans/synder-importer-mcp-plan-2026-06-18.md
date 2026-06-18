@@ -1,8 +1,10 @@
+<!-- /autoplan restore point: /Users/vasiliy/.gstack/projects/synder-importer-plugin/main-autoplan-restore-2026-06-18T15-50-48Z.md -->
+
 # Synder Importer MCP Server + Claude Code Plugin — Plan
 
 **Date:** 2026-06-18
 **Author:** Vasily (Synder dev agent), brief from Michael
-**Status:** Planning + scaffold complete; implementation pending.
+**Status:** Planning + scaffold complete; /autoplan review done (CEO+Eng+DX); implementation pending.
 
 ---
 
@@ -22,7 +24,7 @@ End state: a developer using Claude Code installs `synder-importer` from the mar
 |---|---|---|
 | 1 | New local repo at `~/Documents/projects/synder-importer-plugin/` → eventually `SynderAccounting/synder-importer-plugin` on GitHub | Separate lifecycle from the b-imports Grails monolith; npm-publishable; cleaner marketplace listing. |
 | 2 | MCP over **stdio**, distributed as **npm package** | Zero hosted infra; users invoke via `npx`. Standard Claude plugin pattern. |
-| 3 | **ONE plugin** bundling both skills (`synder-importer` + `gl-importer`) + MCP server | Both skills wrap the same API; namespacing under one plugin (`synder-importer:synder-importer`, `synder-importer:gl-importer`) keeps discovery flexible. |
+| 3 | **ONE plugin** with a single merged skill (`synder-importer`) + MCP server | gl-importer was 95% duplicate of synder-importer (same API, same endpoints). Merged unique lines into synder-importer, dropped the duplicate. One skill = less context for the LLM, simpler maintenance. |
 | 4 | **TypeScript** + `@modelcontextprotocol/sdk`, Node 18+, `tsc` to `dist/` | Canonical MCP SDK. Long-term maintainability. |
 | 5 | **Full write from day 0** — no read-only mode, no confirm gates, no destructive-op flags | Customer's `IMPORTER_API_TOKEN` scope is the trust boundary. Trust the model. |
 | 6 | **Public from day 0** | Listed in `claude-plugins-community` once approved. |
@@ -53,12 +55,8 @@ synder-importer-plugin/
 │   ├── schema.ts                # zod schemas for tool inputs
 │   └── errors.ts                # Maps REST error codes → MCP error responses
 ├── skills/
-│   ├── synder-importer/
-│   │   ├── SKILL.md             # copied from b-imports
-│   │   └── references/
-│   │       └── api.md
-│   └── gl-importer/
-│       ├── SKILL.md
+│   └── synder-importer/
+│       ├── SKILL.md             # merged from b-imports synder-importer + gl-importer
 │       └── references/
 │           └── api.md
 ├── test/
@@ -75,7 +73,7 @@ synder-importer-plugin/
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "synder-importer",
-  "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API. Bundles MCP server + agent skills.",
+  "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API. Bundles MCP server + agent skill.",
   "version": "0.1.0",
   "author": {
     "name": "Synder",
@@ -119,34 +117,42 @@ Notes:
 |---|---|---|
 | `account_get` | GET /account | Current account info |
 | `companies_list` | GET /companies | All connected companies |
-| `company_settings_get` | GET /companies/{cid}/settings | Date format, etc. |
-| `company_settings_update` | POST /companies/{cid}/settings | Change date format |
+| `settings_get` | GET /companies/{cid}/settings | Date format, etc. |
+| `settings_update` | POST /companies/{cid}/settings | Change date format |
 | `entities_list` | GET /companies/{cid}/entities | Importable entity types |
-| `entity_fields_get` | GET /companies/{cid}/entities/{entity}/fields | Field schema for an entity |
+| `fields_get` | GET /companies/{cid}/entities/{entity}/fields | Field schema for an entity |
 | `mapping_create` | POST /companies/{cid}/mappings | New field mapping |
 | `mappings_list` | GET /companies/{cid}/mappings | List mappings |
 | `mapping_update` | PUT /companies/{cid}/mappings/{mid} | Edit mapping |
 | `mapping_delete` | DELETE /companies/{cid}/mappings/{mid} | Remove mapping |
 | `import_execute` | POST /companies/{cid}/imports | Upload + map + import |
-| `import_auto` | POST /companies/{cid}/imports/auto | Smart auto-map + (optional) import |
+| `import_auto` | POST /companies/{cid}/imports/auto | Auto-map + (optional) import |
 | `imports_list` | GET /companies/{cid}/imports | Recent imports |
 | `import_status` | GET /companies/{cid}/imports/{iid} | Single import status |
 | `import_cancel` | POST /companies/{cid}/imports/{iid}/cancel | Cancel scheduled/running |
 | `import_revert` | POST /companies/{cid}/imports/{iid}/revert | Undo finished import |
 | `import_results` | GET /companies/{cid}/imports/{iid}/results | Per-row results (filterable) |
 
+Tool names shortened from `company_settings_get` → `settings_get` and `entity_fields_get` → `fields_get` — the company context is already scoped by `companyId` arg, and MCP namespaces tools by server (`synder-importer.settings_get`) which is already long.
+
 ### Composite (happy-path)
 
 | Tool | Composition |
 |---|---|
-| `import_wait` | Polls `import_status` with exp backoff (2s → 1.5x → cap 30s, default timeout 600s). Returns terminal status + `import_results` summary (counts of INFO/WARNING/ERROR). |
-| `import_csv_smart` | `companies_list` → pick ACTIVE → `import_auto(dryRun=true)` → if `missingRequired.length == 0` → `import_auto(dryRun=false)` → `import_wait`. One call, full pipeline. Returns `{importId, status, summary, missingRequired?}`. |
+| `import_wait` | Polls `import_status` with exp backoff (2s → 1.5x → cap 30s). Accepts `timeoutSeconds?: number` (default 600). Returns terminal status + `import_results` summary (counts of INFO/WARNING/ERROR). At timeout returns `{status: "POLLING", importId, lastSeen}` so LLM can re-call — never blocks indefinitely. |
+| `import_csv` | `companies_list` → pick ACTIVE → `import_auto(dryRun=true)` → returns proposed mapping + `missingRequired` for LLM to present to user → if LLM re-calls with `confirmed: true` → `import_auto(dryRun=false)` → `import_wait`. Two calls minimum (dry-run + confirm), full pipeline. Returns `{importId, status, summary, missingRequired?, proposedMapping?}`. |
 
 Composites are convenience wrappers; the LLM can always fall back to low-level tools for control.
 
+Renamed `import_csv_smart` → `import_csv` — "smart" is marketing, not descriptive. The description already conveys the auto-mapping behavior.
+
+`import_csv` returns the dry-run mapping before importing, giving the LLM a natural place to ask the user "Does this mapping look right?" before proceeding. This isn't a confirm gate — it's a tool that returns data and the LLM decides what to do with it.
+
 ### File upload mechanics
 
-Tools that accept a file (`import_execute`, `import_auto`, `import_csv_smart`) take a **`filePath: string`** argument — absolute or relative path on the user's machine. The MCP server runs locally (stdio) so it has FS access. The client reads the file, builds the multipart form, posts to the API. No base64 round-trip; no size duplication in tool arg JSON.
+Tools that accept a file (`import_execute`, `import_auto`, `import_csv`) take a **`filePath: string`** argument — absolute or relative path on the user's machine. The MCP server runs locally (stdio) so it has FS access. The client reads the file, builds the multipart form, posts to the API. No base64 round-trip; no size duplication in tool arg JSON.
+
+**Client-side validation before upload:** check file extension (`.csv`, `.xlsx`, `.xls` only) and size (max 50MB). Reject with a clear error message before hitting the network.
 
 ### Error surface
 
@@ -157,14 +163,36 @@ Every tool error returns an MCP `isError: true` with structured content:
   "isError": true,
   "content": [{
     "type": "text",
-    "text": "VALIDATION_ERROR (422): Map all required fields. Missing: [DocNumber, TxnDate]. Call entity_fields_get to see schema."
+    "text": "VALIDATION_ERROR (422): Map all required fields. Missing: [DocNumber, TxnDate]. Call fields_get to see schema."
   }]
 }
 ```
 
 This pattern: `{code} ({httpStatus}): {message}. {hint for next step}`. Hints come from the existing skill doc's error table — the LLM already knows what to do.
 
-`RATE_LIMITED` triggers automatic in-server retry (respecting `Retry-After`) up to 3 attempts. If still rate-limited, surfaces to the LLM.
+**HTTP → error code mapping:**
+
+| HTTP | Code | Notes |
+|---|---|---|
+| 400 | VALIDATION_ERROR | Bad request body |
+| 401 | UNAUTHORIZED | Missing/expired token |
+| 403 | FORBIDDEN | Token lacks scope |
+| 404 | NOT_FOUND | Company/import/mapping not found |
+| 409 | CONFLICT | Concurrent modification |
+| 422 | VALIDATION_ERROR | Semantic validation (missing fields, etc.) |
+| 429 | RATE_LIMITED | Auto-retried, see below |
+| 5xx | SERVER_ERROR | Importer API down |
+
+**Rate-limit retry:** respects `Retry-After` header if present, else exponential backoff starting at 2s. Cap total retry wait at 60s, max 3 attempts. Each retry logged to stderr. If still rate-limited after 3 attempts, surfaces to the LLM.
+
+### Observability
+
+The MCP server logs to **stderr** (stdout is reserved for MCP protocol). Logged on every API call:
+- `[synder-importer] GET /companies → 200 (142ms)`
+- `[synder-importer] POST /companies/9/imports/auto → 429 (retry 1/3, waiting 2s)`
+- `[synder-importer] ERROR: IMPORTER_API_TOKEN not set — all tool calls will fail`
+
+On startup, calls `GET /account` to validate the token. If it fails: logs error to stderr, does NOT crash — but every subsequent tool call returns `UNAUTHORIZED: Set IMPORTER_API_TOKEN env var. Generate at importer.synder.com → Account → API Keys.`
 
 ## 7. Implementation sequence (PRs)
 
@@ -222,12 +250,46 @@ No sandbox environment exists for the Importer API — Michael confirmed 2026-06
 ## 12. Still open
 
 1. **License.** MIT assumed (standard for SDKs); confirm with legal if anyone files an issue requesting Apache-2.0 patent grant.
-2. **Two skills, one plugin.** `synder-importer` and `gl-importer` SKILL.md files are 95% identical (same API, slightly different framing). Bundled both in the scaffold. Ship both? Or pick one as canonical and drop the other? Cost of both is ~6KB; benefit is dual discoverability. Recommend ship both.
-3. **Composite tools — too magical?** `import_csv_smart` hides a lot. If it fails mid-pipeline, error attribution gets murky. Mitigation: return progress markers (`stage: "company_lookup" | "auto_map" | "import" | "polling"`) so the LLM can narrate.
+2. ~~**Two skills, one plugin.**~~ **RESOLVED:** Merged into one skill. gl-importer dropped — 95% duplicate, unique lines merged into synder-importer.
+3. ~~**Composite tools — too magical?**~~ **RESOLVED:** `import_csv` (renamed from `import_csv_smart`) now returns dry-run mapping first, requires re-call with `confirmed: true` to proceed. Natural pause point for user confirmation without being a gate. Progress markers still included (`stage` field).
 4. **Idempotency keys.** Server-generated UUID per `import_execute` call. Means re-running the same MCP tool call creates a new import. If we want true idempotency from the LLM's POV, expose `idempotencyKey?: string` arg.
 5. **Marketplace co-hosting.** Plugin lives in `synder-importer-plugin` repo. Does the marketplace.json live there too (single-plugin marketplace) or in a separate `synder-marketplace` for future multi-plugin growth? Recommend single-plugin marketplace co-located for v0.1; split if/when we ship a second plugin.
 
-## 13. Next session
+## 13. Launch plan
+
+Plugin in marketplace is necessary but not sufficient for adoption. Three launch activities:
+
+1. **Existing Importer users** — announce to API key holders via in-app banner or email ("You can now import accounting data by talking to Claude Code").
+2. **Claude Code community** — post in Claude Code Discord / community forums with a demo GIF showing end-to-end import.
+3. **Content** — "How to import accounting data into QuickBooks with Claude Code" blog post on synder.com/blog.
+
+Target: 10 users in first 2 weeks post-marketplace-approval.
+
+## 14. /autoplan review log
+
+Review run 2026-06-18 (inline, CEO + Eng + DX phases, design skipped — no UI scope).
+
+### CEO review — verdict: REVISE (4 items)
+- **C1** `import_csv` now returns dry-run before importing → applied to §6
+- **C2** gl-importer dropped, merged into synder-importer → applied to §2, §3, §12
+- **C3** Launch plan added → new §13
+- **C4** Observability (stderr logging + startup token validation) → applied to §6
+
+### Eng review — 6 items
+- **E1** Token validation at startup → applied to §6 Observability
+- **E2** Rate-limit retry fully specified (Retry-After / 2s backoff / 60s cap / 3 attempts) → applied to §6
+- **E3** HTTP→error code mapping table → applied to §6
+- **E4** `import_wait` timeout returns POLLING, never blocks → applied to §6
+- **E5** vitest coverage config + CI enforcement at 80% lines → add to PR 1 scope
+- **E6** File extension + size validation before upload → applied to §6
+
+### DX review — 4 items
+- **DX1** Quick-start with time estimates + troubleshooting → add to README in PR 6
+- **DX2** Tool names shortened (`settings_get`, `fields_get`) → applied to §6
+- **DX3** Example prompts in README → add to PR 6
+- **DX4** `import_csv_smart` renamed to `import_csv` → applied to §6
+
+## 15. Next session
 
 ```
 Session goal: implement PR 1 (HTTP client + auth) and PR 2 (read-only tools — account_get, companies_list, entities_list, entity_fields_get, mappings_list, imports_list, import_status, import_results).
