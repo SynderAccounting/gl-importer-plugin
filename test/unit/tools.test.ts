@@ -13,15 +13,19 @@ function makeCtx(mock: FetchMock) {
 }
 
 describe("tool registry", () => {
-  it("registers 9 read-only tools in PR 1+2", () => {
-    expect(TOOLS).toHaveLength(9);
+  it("registers 13 tools through PR 3 (9 read-only + 4 write)", () => {
+    expect(TOOLS).toHaveLength(13);
     expect(TOOLS.map((t) => t.name)).toEqual([
       "account_get",
       "companies_list",
       "settings_get",
+      "settings_update",
       "entities_list",
       "fields_get",
       "mappings_list",
+      "mapping_create",
+      "mapping_update",
+      "mapping_delete",
       "imports_list",
       "import_status",
       "import_results",
@@ -127,6 +131,86 @@ describe("tool registry", () => {
     );
     const url = new URL(mock.calls[0].url);
     expect(url.searchParams.toString()).toBe("");
+  });
+
+  it("settings_update POSTs the settings body to /companies/{id}/settings", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 200, body: { dateFormat: "dd/MM/yyyy" } });
+    const result = await findTool("settings_update")!.handler(
+      { companyId: "9", settings: { dateFormat: "dd/MM/yyyy" } },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ dateFormat: "dd/MM/yyyy" });
+    expect(mock.calls[0].method).toBe("POST");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/settings`);
+    expect(mock.calls[0].body).toBe(JSON.stringify({ dateFormat: "dd/MM/yyyy" }));
+    expect(mock.calls[0].headers["content-type"]).toBe("application/json");
+    expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
+  });
+
+  it("mapping_create POSTs {title, entityName, fields} to /companies/{id}/mappings", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 201, body: { id: "m1", title: "JE map" } });
+    const fields = [{ targetFieldId: "f1", sourceFieldTitle: "Date" }];
+    const result = await findTool("mapping_create")!.handler(
+      { companyId: "9", title: "JE map", entityName: "Journal Entry", fields },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ id: "m1" });
+    expect(mock.calls[0].method).toBe("POST");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/mappings`);
+    expect(JSON.parse(mock.calls[0].body as string)).toEqual({
+      title: "JE map",
+      entityName: "Journal Entry",
+      fields,
+    });
+    expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
+  });
+
+  it("mapping_update PUTs full body to /companies/{id}/mappings/{mid}", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 200, body: { id: "m1", title: "JE map v2" } });
+    const fields = [{ targetFieldId: "f1", fixedValue: "USD" }];
+    await findTool("mapping_update")!.handler(
+      {
+        companyId: "9",
+        mappingId: "m1",
+        title: "JE map v2",
+        entityName: "Journal Entry",
+        fields,
+      },
+      makeCtx(mock),
+    );
+    expect(mock.calls[0].method).toBe("PUT");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/mappings/m1`);
+    expect(JSON.parse(mock.calls[0].body as string)).toEqual({
+      title: "JE map v2",
+      entityName: "Journal Entry",
+      fields,
+    });
+  });
+
+  it("mapping_delete DELETEs /companies/{id}/mappings/{mid} and returns confirmation", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 204 });
+    const result = await findTool("mapping_delete")!.handler(
+      { companyId: "9", mappingId: "m1" },
+      makeCtx(mock),
+    );
+    expect(result).toEqual({ deleted: true, mappingId: "m1" });
+    expect(mock.calls[0].method).toBe("DELETE");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/mappings/m1`);
+  });
+
+  it("mapping_delete surfaces 404 as NOT_FOUND", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 404, body: { message: "mapping not found" } });
+    await expect(
+      findTool("mapping_delete")!.handler(
+        { companyId: "9", mappingId: "missing" },
+        makeCtx(mock),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND", httpStatus: 404 });
   });
 
   it("propagates ApiError from 404", async () => {
