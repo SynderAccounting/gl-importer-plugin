@@ -188,10 +188,13 @@ Estimate: 1-2 working sessions per PR. Total ~2 weeks calendar to ship v0.1.0 pu
 
 ## 9. Test strategy
 
-- **Unit (vitest + nock):** every tool's happy path + each documented error code (UNAUTHORIZED, NOT_FOUND, VALIDATION_ERROR, RATE_LIMITED, etc.). Target 80% line coverage.
-- **Integration (opt-in, env-gated):** real API calls against a Synder test account; gated by `IMPORTER_TEST_TOKEN` env var. Runs in CI on `main` only, not on PRs from forks.
-- **MCP protocol test:** spawn the server as subprocess, send `tools/list` + `tools/call` over stdio, assert response shapes match SDK expectations.
-- **Plugin validation:** `claude plugin validate` in CI pre-publish (mandatory for marketplace submission).
+No sandbox environment exists for the Importer API — Michael confirmed 2026-06-18 — so live-API integration tests are out. Revised plan:
+
+- **Unit (vitest + nock):** every tool's happy path + each documented error code (`UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION_ERROR`, `DUPLICATE_REQUEST`, `CONFLICT`, `RATE_LIMITED`, etc.). Target 80% line coverage. Runs on every PR in CI.
+- **MCP protocol test:** spawn the server as subprocess, send `tools/list` + `tools/call` over stdio, assert response shapes match SDK expectations. Pure protocol-level — no live API.
+- **Smoke test = manual dogfood on prod.** Vasily runs `claude --plugin-dir .` against a real Importer account during development. Each PR description includes a "smoke run" entry: which tools were exercised, which company, what was imported (and reverted, if write paths touched).
+- **Plugin validation:** `claude plugin validate` in CI pre-publish — mandatory for marketplace submission.
+- **No CI integration tests against the live API.** Submitting `IMPORTER_API_TOKEN` to GitHub Actions and creating real entities in QBO/Xero on every PR is not acceptable risk.
 
 ## 10. Marketplace submission checklist
 
@@ -205,18 +208,26 @@ Estimate: 1-2 working sessions per PR. Total ~2 weeks calendar to ship v0.1.0 pu
 - [ ] Submitted via https://platform.claude.com/plugins/submit (Console form — Synder isn't a Team/Enterprise Anthropic org)
 - [ ] PR opened in `anthropics/claude-plugins-community` (catalog auto-syncs)
 
-## 11. Open questions / risks for Michael
+## 11. Resolved decisions (Michael, 2026-06-18 follow-up)
 
-1. **npm scope.** `@synder/importer-mcp` requires the `@synder` scope on npmjs.com. Do we own it? If not, what's our fallback — `@synderaccounting/importer-mcp` (matches GitHub org) or unscoped `synder-importer-mcp`? **Decision needed before PR 6 (release prep).**
-2. **Test account.** Need a Synder Importer test account with `IMPORTER_TEST_TOKEN` for integration tests. Who provisions it? Sandbox QBO connection required.
-3. **License.** MIT assumed (standard for SDKs); confirm with legal — could matter if anyone files an issue requesting Apache-2.0 patent grant.
-4. **Two skills, one plugin.** `synder-importer` and `gl-importer` SKILL.md files are 95% identical (same API, slightly different framing). Ship both? Or pick one as canonical and drop the other? Cost of both is ~6KB; benefit is dual discoverability. Recommend ship both.
-5. **Composite tools — too magical?** `import_csv_smart` hides a lot. If it fails mid-pipeline, error attribution gets murky. Mitigation: return progress markers (`stage: "company_lookup" | "auto_map" | "import" | "polling"`) so the LLM can narrate.
-6. **Long imports >10min.** Default `import_wait` timeout is 600s. Real-world imports of 10K+ row CSVs can run longer. Should `import_wait` return early with `{status: "POLLING", importId, lastSeen}` and let the LLM re-call? **Yes — implement as default behavior.**
-7. **Idempotency keys.** Server-generated UUID per `import_execute` call. Means re-running the same MCP tool call creates a new import. If we want true idempotency from the LLM's POV, expose `idempotencyKey?: string` arg.
-8. **Marketplace co-hosting.** Plugin lives in `synder-importer-plugin` repo. Does the marketplace.json live there too (single-plugin marketplace) or in a separate `synder-marketplace` for future multi-plugin growth? Recommend single-plugin marketplace co-located for v0.1; split if/when we ship a second plugin.
+- **npm scope.** Synder owns nothing on npmjs.com yet. Action items for Michael:
+  1. Create npm org (free tier, public). Try names in order: `synder` → `synderaccounting` → `synder-io` → `synder-tech`.
+  2. Generate an automation token, save as GitHub secret `NPM_TOKEN`.
+  3. Add VasilySynderBot (or shared bot account) as Developer.
+  4. Create empty GitHub repo `SynderAccounting/synder-importer-plugin`.
+  Once scope is registered, update `package.json#name` → `@<scope>/importer-mcp` and `plugin.json#repository`.
+- **Test account.** Not happening — no sandbox of prod. Live-API integration tests dropped; replaced with mock-only CI tests + manual dogfood smoke tests. See §9.
+- **`import_wait` long-imports.** Confirmed: default 600s timeout, return `{status: "POLLING", importId, lastSeen}` so LLM re-calls.
 
-## 12. Next session
+## 12. Still open
+
+1. **License.** MIT assumed (standard for SDKs); confirm with legal if anyone files an issue requesting Apache-2.0 patent grant.
+2. **Two skills, one plugin.** `synder-importer` and `gl-importer` SKILL.md files are 95% identical (same API, slightly different framing). Bundled both in the scaffold. Ship both? Or pick one as canonical and drop the other? Cost of both is ~6KB; benefit is dual discoverability. Recommend ship both.
+3. **Composite tools — too magical?** `import_csv_smart` hides a lot. If it fails mid-pipeline, error attribution gets murky. Mitigation: return progress markers (`stage: "company_lookup" | "auto_map" | "import" | "polling"`) so the LLM can narrate.
+4. **Idempotency keys.** Server-generated UUID per `import_execute` call. Means re-running the same MCP tool call creates a new import. If we want true idempotency from the LLM's POV, expose `idempotencyKey?: string` arg.
+5. **Marketplace co-hosting.** Plugin lives in `synder-importer-plugin` repo. Does the marketplace.json live there too (single-plugin marketplace) or in a separate `synder-marketplace` for future multi-plugin growth? Recommend single-plugin marketplace co-located for v0.1; split if/when we ship a second plugin.
+
+## 13. Next session
 
 ```
 Session goal: implement PR 1 (HTTP client + auth) and PR 2 (read-only tools — account_get, companies_list, entities_list, entity_fields_get, mappings_list, imports_list, import_status, import_results).
