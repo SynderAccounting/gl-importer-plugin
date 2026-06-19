@@ -109,4 +109,4 @@ MIT — see [LICENSE](LICENSE).
 ## Support
 
 - Issues: https://github.com/SynderAccounting/gl-importer-plugin/issues
-- Email: support@synder.com
+- Email: help@synder.com

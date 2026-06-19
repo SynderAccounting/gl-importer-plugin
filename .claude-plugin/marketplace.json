@@ -4,7 +4,7 @@
   "description": "Synder's Claude Code plugins. Currently: Synder Importer (gl-importer).",
   "owner": {
     "name": "Synder",
-    "email": "support@synder.com"
+    "email": "help@synder.com"
   },
   "plugins": [
     {
@@ -14,7 +14,7 @@
       "version": "0.1.0",
       "author": {
         "name": "Synder",
-        "email": "support@synder.com"
+        "email": "help@synder.com"
       },
       "homepage": "https://importer.synder.com",
       "repository": "https://github.com/SynderAccounting/gl-importer-plugin",
