@@ -1,5 +1,5 @@
 {
-  "name": "gl-importer-mcp",
+  "name": "@cloudbusiness/gl-importer-mcp",
   "version": "0.1.0",
   "description": "MCP server for the Synder Importer REST API. Imports CSV/XLSX accounting data into QuickBooks Online or Xero.",
   "type": "module",

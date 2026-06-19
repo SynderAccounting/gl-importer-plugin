@@ -2,7 +2,7 @@
   "mcpServers": {
     "gl-importer": {
       "command": "npx",
-      "args": ["-y", "gl-importer-mcp@latest"],
+      "args": ["-y", "@cloudbusiness/gl-importer-mcp@latest"],
       "env": {
         "IMPORTER_BASE_URL": "https://importer.synder.com/api/v1"
       }
