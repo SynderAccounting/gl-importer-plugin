@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "gl-importer": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "gl-importer-mcp@latest"],
       "env": {
         "IMPORTER_BASE_URL": "https://importer.synder.com/api/v1"
       }
