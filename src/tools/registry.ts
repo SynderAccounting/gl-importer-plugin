@@ -12,6 +12,7 @@ import {
   importCancel,
   importRevert,
 } from "./imports.js";
+import { importWait, importCsv } from "./composites.js";
 
 export const TOOLS: ToolDefinition[] = [
   accountGet,
@@ -31,6 +32,8 @@ export const TOOLS: ToolDefinition[] = [
   importAuto,
   importCancel,
   importRevert,
+  importWait,
+  importCsv,
 ];
 
 export function findTool(name: string): ToolDefinition | undefined {

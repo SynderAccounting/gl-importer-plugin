@@ -29,8 +29,8 @@ function makeCtx(mock: FetchMock) {
 }
 
 describe("tool registry", () => {
-  it("registers 17 tools through PR 4 (read + mapping CRUD + import execution)", () => {
-    expect(TOOLS).toHaveLength(17);
+  it("registers 19 tools through PR 5 (15 low-level + 2 composites)", () => {
+    expect(TOOLS).toHaveLength(19);
     expect(TOOLS.map((t) => t.name)).toEqual([
       "account_get",
       "companies_list",
@@ -49,6 +49,8 @@ describe("tool registry", () => {
       "import_auto",
       "import_cancel",
       "import_revert",
+      "import_wait",
+      "import_csv",
     ]);
   });
 
