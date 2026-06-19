@@ -3,7 +3,15 @@ import { accountGet } from "./account.js";
 import { companiesList, settingsGet, settingsUpdate } from "./companies.js";
 import { entitiesList, fieldsGet } from "./entities.js";
 import { mappingsList, mappingCreate, mappingUpdate, mappingDelete } from "./mappings.js";
-import { importsList, importStatus, importResults } from "./imports.js";
+import {
+  importsList,
+  importStatus,
+  importResults,
+  importExecute,
+  importAuto,
+  importCancel,
+  importRevert,
+} from "./imports.js";
 
 export const TOOLS: ToolDefinition[] = [
   accountGet,
@@ -19,6 +27,10 @@ export const TOOLS: ToolDefinition[] = [
   importsList,
   importStatus,
   importResults,
+  importExecute,
+  importAuto,
+  importCancel,
+  importRevert,
 ];
 
 export function findTool(name: string): ToolDefinition | undefined {

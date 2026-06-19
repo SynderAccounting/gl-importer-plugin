@@ -19,6 +19,8 @@ export interface RequestOptions {
   path: string;
   query?: Record<string, string | number | undefined>;
   body?: unknown;
+  /** Pre-built multipart form. When set, body is ignored and Content-Type is left to fetch (sets boundary). */
+  formData?: FormData;
   /** When true, a fresh Idempotency-Key is added on the first attempt and reused on retries. */
   idempotent?: boolean;
   idempotencyKey?: string;
@@ -56,15 +58,23 @@ export class ImporterClient {
         Accept: "application/json",
         "User-Agent": USER_AGENT,
       };
-      if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+      if (opts.formData === undefined && opts.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+      }
       if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+
+      const requestBody: BodyInit | undefined = opts.formData
+        ? opts.formData
+        : opts.body === undefined
+          ? undefined
+          : JSON.stringify(opts.body);
 
       let res: Response;
       try {
         res = await this.fetchImpl(url, {
           method,
           headers,
-          body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+          body: requestBody,
         });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);

@@ -1,9 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ImporterClient } from "../../src/client.js";
 import { TOOLS, findTool } from "../../src/tools/registry.js";
 import { FetchMock } from "./fetch-mock.js";
 
 const BASE = "https://importer.synder.com/api/v1";
+
+let fixtureDir: string;
+let csvPath: string;
+
+beforeAll(async () => {
+  fixtureDir = await mkdtemp(join(tmpdir(), "gl-importer-tools-"));
+  csvPath = join(fixtureDir, "sample.csv");
+  await writeFile(csvPath, "Date,Amount\n2026-01-01,100\n");
+});
+
+afterAll(async () => {
+  await rm(fixtureDir, { recursive: true, force: true });
+});
 
 function makeCtx(mock: FetchMock) {
   return {
@@ -13,8 +29,8 @@ function makeCtx(mock: FetchMock) {
 }
 
 describe("tool registry", () => {
-  it("registers 13 tools through PR 3 (9 read-only + 4 write)", () => {
-    expect(TOOLS).toHaveLength(13);
+  it("registers 17 tools through PR 4 (read + mapping CRUD + import execution)", () => {
+    expect(TOOLS).toHaveLength(17);
     expect(TOOLS.map((t) => t.name)).toEqual([
       "account_get",
       "companies_list",
@@ -29,6 +45,10 @@ describe("tool registry", () => {
       "imports_list",
       "import_status",
       "import_results",
+      "import_execute",
+      "import_auto",
+      "import_cancel",
+      "import_revert",
     ]);
   });
 
@@ -211,6 +231,109 @@ describe("tool registry", () => {
         makeCtx(mock),
       ),
     ).rejects.toMatchObject({ code: "NOT_FOUND", httpStatus: 404 });
+  });
+
+  it("import_execute uploads file as multipart with entityName + mappingId", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 201, body: { id: "imp1", status: "SCHEDULED" } });
+
+    const result = await findTool("import_execute")!.handler(
+      {
+        companyId: "9",
+        filePath: csvPath,
+        entityName: "Journal Entry",
+        mappingId: "m1",
+      },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ id: "imp1", status: "SCHEDULED" });
+    expect(mock.calls[0].method).toBe("POST");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports`);
+    const fd = mock.calls[0].body as FormData;
+    expect(fd).toBeInstanceOf(FormData);
+    expect(fd.get("entityName")).toBe("Journal Entry");
+    expect(fd.get("mappingId")).toBe("m1");
+    const file = fd.get("file") as File;
+    expect(file.name).toBe("sample.csv");
+    expect(file.type).toBe("text/csv");
+    expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
+  });
+
+  it("import_execute rejects unsupported file types before hitting the API", async () => {
+    const mock = new FetchMock();
+    const badPath = join(fixtureDir, "bad.txt");
+    await writeFile(badPath, "hi");
+    await expect(
+      findTool("import_execute")!.handler(
+        { companyId: "9", filePath: badPath, entityName: "Bill", mappingId: "m1" },
+        makeCtx(mock),
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mock.calls).toHaveLength(0);
+  });
+
+  it("import_auto with dryRun=true sends 'dryRun' in form and returns proposed mapping", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({
+      status: 200,
+      body: { proposedMapping: { fields: [] }, missingRequired: [] },
+    });
+
+    const result = await findTool("import_auto")!.handler(
+      {
+        companyId: "9",
+        filePath: csvPath,
+        entityName: "Bill",
+        dryRun: true,
+      },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ proposedMapping: { fields: [] } });
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports/auto`);
+    const fd = mock.calls[0].body as FormData;
+    expect(fd.get("entityName")).toBe("Bill");
+    expect(fd.get("dryRun")).toBe("true");
+  });
+
+  it("import_auto omits dryRun when falsy or absent", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 201, body: { id: "imp2", status: "SCHEDULED" } });
+
+    await findTool("import_auto")!.handler(
+      { companyId: "9", filePath: csvPath, entityName: "Bill" },
+      makeCtx(mock),
+    );
+    const fd = mock.calls[0].body as FormData;
+    expect(fd.has("dryRun")).toBe(false);
+    expect(fd.get("entityName")).toBe("Bill");
+  });
+
+  it("import_cancel POSTs to /imports/{id}/cancel with no body", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 200, body: { id: "42", status: "CANCELED" } });
+
+    const result = await findTool("import_cancel")!.handler(
+      { companyId: "9", importId: "42" },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ status: "CANCELED" });
+    expect(mock.calls[0].method).toBe("POST");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports/42/cancel`);
+    expect(mock.calls[0].body).toBeUndefined();
+  });
+
+  it("import_revert POSTs to /imports/{id}/revert with no body", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 200, body: { id: "42", status: "REVERTING" } });
+
+    const result = await findTool("import_revert")!.handler(
+      { companyId: "9", importId: "42" },
+      makeCtx(mock),
+    );
+    expect(result).toMatchObject({ status: "REVERTING" });
+    expect(mock.calls[0].method).toBe("POST");
+    expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports/42/revert`);
+    expect(mock.calls[0].body).toBeUndefined();
   });
 
   it("propagates ApiError from 404", async () => {

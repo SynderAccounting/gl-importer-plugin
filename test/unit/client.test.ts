@@ -203,4 +203,23 @@ describe("ImporterClient", () => {
     expect(mock.calls[0].headers["content-type"]).toBe("application/json");
     expect(mock.calls[0].body).toBe(JSON.stringify({ title: "x" }));
   });
+
+  it("sends formData as-is and lets fetch own the Content-Type", async () => {
+    const mock = new FetchMock();
+    mock.enqueue({ status: 201, body: { id: "imp1" } });
+
+    const fd = new FormData();
+    fd.append("file", new Blob([new Uint8Array([1, 2, 3])], { type: "text/csv" }), "x.csv");
+    fd.append("entityName", "Bill");
+
+    const client = makeClient(mock);
+    await client.request({
+      method: "POST",
+      path: "/companies/9/imports",
+      formData: fd,
+    });
+    expect(mock.calls[0].body).toBe(fd);
+    expect(mock.calls[0].headers["content-type"]).toBeUndefined();
+    expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
+  });
 });
