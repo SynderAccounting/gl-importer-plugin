@@ -1,0 +1,68 @@
+{
+  "manifest_version": "0.3",
+  "name": "gl-importer-mcp",
+  "display_name": "Synder gl-importer (QuickBooks/Xero)",
+  "version": "0.1.1",
+  "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API.",
+  "long_description": "Official MCP server from Synder. Exposes the Synder Importer REST API as 19 tools covering accounts, companies, settings, entities, fields, field-mapping rules, post-import rules, imports, status polling, results, cancel, and revert. Same engine that thousands of bookkeepers use through the Synder web app, now callable from Claude, Cursor, and any other MCP-compatible host.\n\n**Typical flow:** Paste a CSV path, tell the model what entity you're importing (Invoice, Bill, JournalEntry, etc.), and the model walks the full pipeline — column-to-field mapping, validation, dry-run, commit. Mapping rules are persisted per company so the next import is one step.\n\nRepo: https://github.com/SynderAccounting/gl-importer-plugin\nDocs: https://importer.synder.com",
+  "author": {
+    "name": "Synder",
+    "email": "help@synder.com",
+    "url": "https://importer.synder.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynderAccounting/gl-importer-plugin.git"
+  },
+  "homepage": "https://importer.synder.com",
+  "documentation": "https://github.com/SynderAccounting/gl-importer-plugin#readme",
+  "support": "https://github.com/SynderAccounting/gl-importer-plugin/issues",
+  "icon": "assets/logo.png",
+  "keywords": [
+    "mcp",
+    "synder",
+    "importer",
+    "quickbooks",
+    "xero",
+    "accounting",
+    "csv",
+    "xlsx",
+    "bookkeeping"
+  ],
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "IMPORTER_API_TOKEN": "${user_config.importer_api_token}",
+        "IMPORTER_BASE_URL": "${user_config.importer_base_url}"
+      }
+    }
+  },
+  "user_config": {
+    "importer_api_token": {
+      "type": "string",
+      "title": "Synder Importer API Token",
+      "description": "Bearer token from importer.synder.com → Account → API Keys.",
+      "sensitive": true,
+      "required": true
+    },
+    "importer_base_url": {
+      "type": "string",
+      "title": "Importer API Base URL",
+      "description": "Override for staging/test. Leave the default for production.",
+      "default": "https://importer.synder.com/api/v1",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

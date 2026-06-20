@@ -33,6 +33,10 @@ Then set your token in the shell that launches Claude Code:
 export IMPORTER_API_TOKEN="your_token_here"
 ```
 
+### Claude Desktop (one-click MCP install)
+
+Download the latest `.mcpb` bundle from [Releases](https://github.com/SynderAccounting/gl-importer-plugin/releases) and double-click it. Claude Desktop will prompt you for the API token.
+
 ### From source (development)
 
 ```bash
