@@ -42,7 +42,7 @@ function virtualClockCtx(mock: FetchMock) {
   };
 }
 
-describe("import_wait", () => {
+describe("wait_for_import", () => {
   it("returns terminal status + result summary as soon as status is FINISHED", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "42", status: "FINISHED" } });
@@ -51,7 +51,7 @@ describe("import_wait", () => {
     mock.enqueue({ status: 200, body: { data: [], pagination: { total: 0 } } }); // ERROR
 
     const ctx = virtualClockCtx(mock);
-    const result = (await findTool("import_wait")!.handler(
+    const result = (await findTool("wait_for_import")!.handler(
       { companyId: "9", importId: "42" },
       ctx,
     )) as { status: string; summary: { INFO: number; WARNING: number; ERROR: number } };
@@ -72,7 +72,7 @@ describe("import_wait", () => {
     mock.enqueue({ status: 200, body: { data: [], pagination: { total: 0 } } });
 
     const ctx = virtualClockCtx(mock);
-    const result = (await findTool("import_wait")!.handler(
+    const result = (await findTool("wait_for_import")!.handler(
       { companyId: "9", importId: "42" },
       ctx,
     )) as { status: string; summary: Record<string, number> };
@@ -90,7 +90,7 @@ describe("import_wait", () => {
     }
 
     const ctx = virtualClockCtx(mock);
-    const result = (await findTool("import_wait")!.handler(
+    const result = (await findTool("wait_for_import")!.handler(
       { companyId: "9", importId: "42", timeoutSeconds: 5 },
       ctx,
     )) as { status: string; importId: string; lastSeen: { status: string } };
@@ -108,7 +108,7 @@ describe("import_wait", () => {
     mock.enqueue({ status: 200, body: { data: [{}] } });
 
     const ctx = virtualClockCtx(mock);
-    const result = (await findTool("import_wait")!.handler(
+    const result = (await findTool("wait_for_import")!.handler(
       { companyId: "9", importId: "1" },
       ctx,
     )) as { summary: { INFO: number; WARNING: number; ERROR: number } };
@@ -123,7 +123,7 @@ describe("import_wait", () => {
     mock.enqueue({ status: 200, body: { data: [], pagination: { total: 2 } } });
 
     const ctx = virtualClockCtx(mock);
-    const result = (await findTool("import_wait")!.handler(
+    const result = (await findTool("wait_for_import")!.handler(
       { companyId: "9", importId: "1" },
       ctx,
     )) as { status: string; summary: { INFO: number | null; WARNING: number; ERROR: number } };
@@ -215,11 +215,11 @@ describe("import_csv", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("confirmed: runs auto (no dryRun) then polls import_wait to terminal", async () => {
+  it("confirmed: runs auto (no dryRun) then polls wait_for_import to terminal", async () => {
     const mock = new FetchMock();
-    // import_auto (confirmed) — returns created import
+    // auto_import (confirmed) — returns created import
     mock.enqueue({ status: 201, body: { id: "imp99", status: "SCHEDULED" } });
-    // import_wait first poll — FINISHED
+    // wait_for_import first poll — FINISHED
     mock.enqueue({ status: 200, body: { id: "imp99", status: "FINISHED" } });
     // result summaries
     mock.enqueue({ status: 200, body: { data: [], pagination: { total: 12 } } });

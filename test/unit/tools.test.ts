@@ -32,24 +32,24 @@ describe("tool registry", () => {
   it("registers 19 tools through PR 5 (15 low-level + 2 composites)", () => {
     expect(TOOLS).toHaveLength(19);
     expect(TOOLS.map((t) => t.name)).toEqual([
-      "account_get",
-      "companies_list",
-      "settings_get",
-      "settings_update",
-      "entities_list",
-      "fields_get",
-      "mappings_list",
-      "mapping_create",
-      "mapping_update",
-      "mapping_delete",
-      "imports_list",
-      "import_status",
-      "import_results",
-      "import_execute",
-      "import_auto",
-      "import_cancel",
-      "import_revert",
-      "import_wait",
+      "get_account",
+      "list_companies",
+      "get_settings",
+      "update_settings",
+      "list_entities",
+      "get_fields",
+      "list_mappings",
+      "create_mapping",
+      "update_mapping",
+      "delete_mapping",
+      "list_imports",
+      "get_import_status",
+      "get_import_results",
+      "execute_import",
+      "auto_import",
+      "cancel_import",
+      "revert_import",
+      "wait_for_import",
       "import_csv",
     ]);
   });
@@ -64,65 +64,65 @@ describe("tool registry", () => {
     expect(findTool("nope")).toBeUndefined();
   });
 
-  it("account_get hits /account", async () => {
+  it("get_account hits /account", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "5", email: "x@y.z", status: "ACTIVE" } });
-    const result = await findTool("account_get")!.handler({}, makeCtx(mock));
+    const result = await findTool("get_account")!.handler({}, makeCtx(mock));
     expect(result).toMatchObject({ id: "5" });
     expect(mock.calls[0].url).toBe(`${BASE}/account`);
   });
 
-  it("companies_list hits /companies", async () => {
+  it("list_companies hits /companies", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: [{ id: "9", companyName: "Acme" }] });
-    const result = (await findTool("companies_list")!.handler({}, makeCtx(mock))) as unknown[];
+    const result = (await findTool("list_companies")!.handler({}, makeCtx(mock))) as unknown[];
     expect(result).toHaveLength(1);
     expect(mock.calls[0].url).toBe(`${BASE}/companies`);
   });
 
-  it("settings_get hits /companies/{id}/settings", async () => {
+  it("get_settings hits /companies/{id}/settings", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { dateFormat: "MM/dd/yyyy" } });
-    await findTool("settings_get")!.handler({ companyId: "9" }, makeCtx(mock));
+    await findTool("get_settings")!.handler({ companyId: "9" }, makeCtx(mock));
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/settings`);
   });
 
-  it("entities_list URL-encodes the company id", async () => {
+  it("list_entities URL-encodes the company id", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: [] });
-    await findTool("entities_list")!.handler({ companyId: "9" }, makeCtx(mock));
+    await findTool("list_entities")!.handler({ companyId: "9" }, makeCtx(mock));
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/entities`);
   });
 
-  it("fields_get URL-encodes the entity name", async () => {
+  it("get_fields URL-encodes the entity name", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: [{ id: "1", title: "DocNumber" }] });
-    await findTool("fields_get")!.handler(
+    await findTool("get_fields")!.handler(
       { companyId: "9", entityName: "Journal Entry" },
       makeCtx(mock),
     );
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/entities/Journal%20Entry/fields`);
   });
 
-  it("mappings_list returns mappings", async () => {
+  it("list_mappings returns mappings", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: [] });
-    const result = await findTool("mappings_list")!.handler({ companyId: "9" }, makeCtx(mock));
+    const result = await findTool("list_mappings")!.handler({ companyId: "9" }, makeCtx(mock));
     expect(result).toEqual([]);
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/mappings`);
   });
 
-  it("imports_list returns imports", async () => {
+  it("list_imports returns imports", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: [{ id: "42", status: "FINISHED" }] });
-    await findTool("imports_list")!.handler({ companyId: "9" }, makeCtx(mock));
+    await findTool("list_imports")!.handler({ companyId: "9" }, makeCtx(mock));
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports`);
   });
 
-  it("import_status returns status object", async () => {
+  it("get_import_status returns status object", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "42", status: "FINISHED" } });
-    const result = await findTool("import_status")!.handler(
+    const result = await findTool("get_import_status")!.handler(
       { companyId: "9", importId: "42" },
       makeCtx(mock),
     );
@@ -130,10 +130,10 @@ describe("tool registry", () => {
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/imports/42`);
   });
 
-  it("import_results forwards type, page, perPage as query params", async () => {
+  it("get_import_results forwards type, page, perPage as query params", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { data: [], pagination: {} } });
-    await findTool("import_results")!.handler(
+    await findTool("get_import_results")!.handler(
       { companyId: "9", importId: "42", type: "ERROR", page: 2, perPage: 50 },
       makeCtx(mock),
     );
@@ -144,10 +144,10 @@ describe("tool registry", () => {
     expect(url.searchParams.get("perPage")).toBe("50");
   });
 
-  it("import_results works without optional query params", async () => {
+  it("get_import_results works without optional query params", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { data: [] } });
-    await findTool("import_results")!.handler(
+    await findTool("get_import_results")!.handler(
       { companyId: "9", importId: "42" },
       makeCtx(mock),
     );
@@ -155,10 +155,10 @@ describe("tool registry", () => {
     expect(url.searchParams.toString()).toBe("");
   });
 
-  it("settings_update POSTs the settings body to /companies/{id}/settings", async () => {
+  it("update_settings POSTs the settings body to /companies/{id}/settings", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { dateFormat: "dd/MM/yyyy" } });
-    const result = await findTool("settings_update")!.handler(
+    const result = await findTool("update_settings")!.handler(
       { companyId: "9", settings: { dateFormat: "dd/MM/yyyy" } },
       makeCtx(mock),
     );
@@ -170,11 +170,11 @@ describe("tool registry", () => {
     expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
   });
 
-  it("mapping_create POSTs {title, entityName, fields} to /companies/{id}/mappings", async () => {
+  it("create_mapping POSTs {title, entityName, fields} to /companies/{id}/mappings", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 201, body: { id: "m1", title: "JE map" } });
     const fields = [{ targetFieldId: "f1", sourceFieldTitle: "Date" }];
-    const result = await findTool("mapping_create")!.handler(
+    const result = await findTool("create_mapping")!.handler(
       { companyId: "9", title: "JE map", entityName: "Journal Entry", fields },
       makeCtx(mock),
     );
@@ -189,11 +189,11 @@ describe("tool registry", () => {
     expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
   });
 
-  it("mapping_update PUTs full body to /companies/{id}/mappings/{mid}", async () => {
+  it("update_mapping PUTs full body to /companies/{id}/mappings/{mid}", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "m1", title: "JE map v2" } });
     const fields = [{ targetFieldId: "f1", fixedValue: "USD" }];
-    await findTool("mapping_update")!.handler(
+    await findTool("update_mapping")!.handler(
       {
         companyId: "9",
         mappingId: "m1",
@@ -212,10 +212,10 @@ describe("tool registry", () => {
     });
   });
 
-  it("mapping_delete DELETEs /companies/{id}/mappings/{mid} and returns confirmation", async () => {
+  it("delete_mapping DELETEs /companies/{id}/mappings/{mid} and returns confirmation", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 204 });
-    const result = await findTool("mapping_delete")!.handler(
+    const result = await findTool("delete_mapping")!.handler(
       { companyId: "9", mappingId: "m1" },
       makeCtx(mock),
     );
@@ -224,22 +224,22 @@ describe("tool registry", () => {
     expect(mock.calls[0].url).toBe(`${BASE}/companies/9/mappings/m1`);
   });
 
-  it("mapping_delete surfaces 404 as NOT_FOUND", async () => {
+  it("delete_mapping surfaces 404 as NOT_FOUND", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 404, body: { message: "mapping not found" } });
     await expect(
-      findTool("mapping_delete")!.handler(
+      findTool("delete_mapping")!.handler(
         { companyId: "9", mappingId: "missing" },
         makeCtx(mock),
       ),
     ).rejects.toMatchObject({ code: "NOT_FOUND", httpStatus: 404 });
   });
 
-  it("import_execute uploads file as multipart with entityName + mappingId", async () => {
+  it("execute_import uploads file as multipart with entityName + mappingId", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 201, body: { id: "imp1", status: "SCHEDULED" } });
 
-    const result = await findTool("import_execute")!.handler(
+    const result = await findTool("execute_import")!.handler(
       {
         companyId: "9",
         filePath: csvPath,
@@ -261,12 +261,12 @@ describe("tool registry", () => {
     expect(mock.calls[0].headers["idempotency-key"]).toBeTruthy();
   });
 
-  it("import_execute rejects unsupported file types before hitting the API", async () => {
+  it("execute_import rejects unsupported file types before hitting the API", async () => {
     const mock = new FetchMock();
     const badPath = join(fixtureDir, "bad.txt");
     await writeFile(badPath, "hi");
     await expect(
-      findTool("import_execute")!.handler(
+      findTool("execute_import")!.handler(
         { companyId: "9", filePath: badPath, entityName: "Bill", mappingId: "m1" },
         makeCtx(mock),
       ),
@@ -274,14 +274,14 @@ describe("tool registry", () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  it("import_auto with dryRun=true sends 'dryRun' in form and returns proposed mapping", async () => {
+  it("auto_import with dryRun=true sends 'dryRun' in form and returns proposed mapping", async () => {
     const mock = new FetchMock();
     mock.enqueue({
       status: 200,
       body: { proposedMapping: { fields: [] }, missingRequired: [] },
     });
 
-    const result = await findTool("import_auto")!.handler(
+    const result = await findTool("auto_import")!.handler(
       {
         companyId: "9",
         filePath: csvPath,
@@ -297,11 +297,11 @@ describe("tool registry", () => {
     expect(fd.get("dryRun")).toBe("true");
   });
 
-  it("import_auto omits dryRun when falsy or absent", async () => {
+  it("auto_import omits dryRun when falsy or absent", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 201, body: { id: "imp2", status: "SCHEDULED" } });
 
-    await findTool("import_auto")!.handler(
+    await findTool("auto_import")!.handler(
       { companyId: "9", filePath: csvPath, entityName: "Bill" },
       makeCtx(mock),
     );
@@ -310,11 +310,11 @@ describe("tool registry", () => {
     expect(fd.get("entityName")).toBe("Bill");
   });
 
-  it("import_cancel POSTs to /imports/{id}/cancel with no body", async () => {
+  it("cancel_import POSTs to /imports/{id}/cancel with no body", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "42", status: "CANCELED" } });
 
-    const result = await findTool("import_cancel")!.handler(
+    const result = await findTool("cancel_import")!.handler(
       { companyId: "9", importId: "42" },
       makeCtx(mock),
     );
@@ -324,11 +324,11 @@ describe("tool registry", () => {
     expect(mock.calls[0].body).toBeUndefined();
   });
 
-  it("import_revert POSTs to /imports/{id}/revert with no body", async () => {
+  it("revert_import POSTs to /imports/{id}/revert with no body", async () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 200, body: { id: "42", status: "REVERTING" } });
 
-    const result = await findTool("import_revert")!.handler(
+    const result = await findTool("revert_import")!.handler(
       { companyId: "9", importId: "42" },
       makeCtx(mock),
     );
@@ -342,7 +342,7 @@ describe("tool registry", () => {
     const mock = new FetchMock();
     mock.enqueue({ status: 404, body: { message: "not found" } });
     await expect(
-      findTool("settings_get")!.handler({ companyId: "999" }, makeCtx(mock)),
+      findTool("get_settings")!.handler({ companyId: "999" }, makeCtx(mock)),
     ).rejects.toMatchObject({ code: "NOT_FOUND", httpStatus: 404 });
   });
 });

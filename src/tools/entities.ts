@@ -1,13 +1,13 @@
 import type { ToolDefinition } from "./types.js";
 
 export const entitiesList: ToolDefinition = {
-  name: "entities_list",
+  name: "list_entities",
   description:
-    "Lists importable entity types for a company (Invoice, Bill, JournalEntry, Customer, Vendor, etc.). Use the returned 'name' as entityName for fields_get and import tools.",
+    "Lists importable entity types for a company (Invoice, Bill, JournalEntry, Customer, Vendor, etc.). Use the returned 'name' as entityName for get_fields and import tools.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
     },
     required: ["companyId"],
     additionalProperties: false,
@@ -44,16 +44,16 @@ export const entitiesList: ToolDefinition = {
 };
 
 export const fieldsGet: ToolDefinition = {
-  name: "fields_get",
+  name: "get_fields",
   description:
     "Returns the field schema for an entity in a company: every field with its type, required flag, alternativeTitles, and predefinedValues. Use to build or verify a mapping before running an import.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
       entityName: {
         type: "string",
-        description: "Entity name from entities_list (e.g., 'Invoice', 'Bill').",
+        description: "Entity name from list_entities (e.g., 'Invoice', 'Bill').",
       },
     },
     required: ["companyId", "entityName"],
@@ -68,7 +68,7 @@ export const fieldsGet: ToolDefinition = {
         items: {
           type: "object",
           properties: {
-            id: { type: "string", description: "Field id — pass as targetFieldId in mapping_create/update." },
+            id: { type: "string", description: "Field id — pass as targetFieldId in create_mapping/update." },
             name: { type: "string", description: "Human-readable field name." },
             type: { type: "string", description: "Field type (string, number, date, reference, etc.)." },
             required: { type: "boolean", description: "Whether the field must be supplied per row." },

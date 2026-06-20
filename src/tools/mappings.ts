@@ -26,13 +26,13 @@ const MAPPING_OUTPUT_SHAPE = {
 } as const;
 
 export const mappingsList: ToolDefinition = {
-  name: "mappings_list",
+  name: "list_mappings",
   description:
     "Lists field mappings saved for a company. Each mapping is reusable across imports of the same entity type.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
     },
     required: ["companyId"],
     additionalProperties: false,
@@ -63,7 +63,7 @@ const FIELD_SCHEMA = {
   properties: {
     targetFieldId: {
       type: "string",
-      description: "Importer field id from fields_get for the target entity.",
+      description: "Importer field id from get_fields for the target entity.",
     },
     sourceFieldTitle: {
       type: "string",
@@ -78,17 +78,17 @@ const FIELD_SCHEMA = {
 } as const;
 
 export const mappingCreate: ToolDefinition = {
-  name: "mapping_create",
+  name: "create_mapping",
   description:
-    "Creates a new field mapping for an entity (e.g. 'Journal Entry', 'Bill', 'Invoice'). Look up valid target fields with fields_get first. Returns the created mapping including its id.",
+    "Creates a new field mapping for an entity (e.g. 'Journal Entry', 'Bill', 'Invoice'). Look up valid target fields with get_fields first. Returns the created mapping including its id.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
       title: { type: "string", description: "Human-readable mapping name." },
       entityName: {
         type: "string",
-        description: "Entity this mapping targets — must match entities_list output (e.g. 'Journal Entry').",
+        description: "Entity this mapping targets — must match list_entities output (e.g. 'Journal Entry').",
       },
       fields: {
         type: "array",
@@ -122,18 +122,18 @@ export const mappingCreate: ToolDefinition = {
 };
 
 export const mappingUpdate: ToolDefinition = {
-  name: "mapping_update",
+  name: "update_mapping",
   description:
-    "Replaces an existing mapping in full. Fetch the current mapping with mappings_list first and send the whole desired shape — this is a PUT, not a patch. Returns the updated mapping.",
+    "Replaces an existing mapping in full. Fetch the current mapping with list_mappings first and send the whole desired shape — this is a PUT, not a patch. Returns the updated mapping.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      mappingId: { type: "string", description: "Mapping id from mappings_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      mappingId: { type: "string", description: "Mapping id from list_mappings." },
       title: { type: "string", description: "Human-readable mapping name." },
       entityName: {
         type: "string",
-        description: "Entity this mapping targets — must match entities_list output.",
+        description: "Entity this mapping targets — must match list_entities output.",
       },
       fields: {
         type: "array",
@@ -168,14 +168,14 @@ export const mappingUpdate: ToolDefinition = {
 };
 
 export const mappingDelete: ToolDefinition = {
-  name: "mapping_delete",
+  name: "delete_mapping",
   description:
     "Deletes a saved mapping. Irreversible. Imports that referenced this mapping keep their historical record but new imports can no longer pick it.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      mappingId: { type: "string", description: "Mapping id from mappings_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      mappingId: { type: "string", description: "Mapping id from list_mappings." },
     },
     required: ["companyId", "mappingId"],
     additionalProperties: false,

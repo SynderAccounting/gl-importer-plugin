@@ -42,13 +42,13 @@ const IMPORT_RESULT_ROW_SHAPE = {
 } as const;
 
 export const importsList: ToolDefinition = {
-  name: "imports_list",
+  name: "list_imports",
   description:
     "Lists recent imports for a company with status and timestamps. Use to find an importId for status / results / revert / cancel.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
     },
     required: ["companyId"],
     additionalProperties: false,
@@ -73,14 +73,14 @@ export const importsList: ToolDefinition = {
 };
 
 export const importStatus: ToolDefinition = {
-  name: "import_status",
+  name: "get_import_status",
   description:
     "Returns a single import's current status and summary (total / succeeded / failed / warnings). Status lifecycle: SCHEDULED → IN_PROGRESS → FINISHED | FINISHED_WITH_WARNINGS | FAILED | CANCELED. FINISHED can transition to REVERTING → REVERTED.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      importId: { type: "string", description: "Import id from imports_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      importId: { type: "string", description: "Import id from list_imports." },
     },
     required: ["companyId", "importId"],
     additionalProperties: false,
@@ -102,14 +102,14 @@ export const importStatus: ToolDefinition = {
 };
 
 export const importResults: ToolDefinition = {
-  name: "import_results",
+  name: "get_import_results",
   description:
     "Returns per-row results for a finished import. Filter by 'type' (INFO / WARNING / ERROR) to surface only failures. Paginated — defaults to 20 rows per page, max 100.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      importId: { type: "string", description: "Import id from imports_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      importId: { type: "string", description: "Import id from list_imports." },
       type: {
         type: "string",
         enum: ["INFO", "WARNING", "ERROR"],
@@ -158,22 +158,22 @@ export const importResults: ToolDefinition = {
 };
 
 export const importExecute: ToolDefinition = {
-  name: "import_execute",
+  name: "execute_import",
   description:
-    "Uploads a CSV/XLSX file and starts an import using an existing mapping. The MCP server reads the file from disk — pass an absolute path. Returns the created import object including importId. Status starts as SCHEDULED — poll import_status or use import_wait. Limits: .csv/.xlsx/.xls only, 50MB max.",
+    "Uploads a CSV/XLSX file and starts an import using an existing mapping. The MCP server reads the file from disk — pass an absolute path. Returns the created import object including importId. Status starts as SCHEDULED — poll get_import_status or use wait_for_import. Limits: .csv/.xlsx/.xls only, 50MB max.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
       filePath: {
         type: "string",
         description: "Absolute path to a .csv, .xlsx, or .xls file on the machine running the MCP server.",
       },
       entityName: {
         type: "string",
-        description: "Entity to import as — must match entities_list (e.g. 'Journal Entry').",
+        description: "Entity to import as — must match list_entities (e.g. 'Journal Entry').",
       },
-      mappingId: { type: "string", description: "Mapping id from mappings_list to apply to the file." },
+      mappingId: { type: "string", description: "Mapping id from list_mappings to apply to the file." },
     },
     required: ["companyId", "filePath", "entityName", "mappingId"],
     additionalProperties: false,
@@ -202,17 +202,17 @@ export const importExecute: ToolDefinition = {
 };
 
 export const importAuto: ToolDefinition = {
-  name: "import_auto",
+  name: "auto_import",
   description:
     "Uploads a file and asks the server to auto-map columns to the target entity. Set dryRun=true to get the proposed mapping back without creating an import — useful for showing the user what will happen and asking 'does this look right?' before committing. Set dryRun=false (default) to auto-map and import in one call.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
       filePath: { type: "string", description: "Absolute path to a .csv, .xlsx, or .xls file." },
       entityName: {
         type: "string",
-        description: "Entity to import as — must match entities_list output.",
+        description: "Entity to import as — must match list_entities output.",
       },
       dryRun: {
         type: "boolean",
@@ -270,14 +270,14 @@ export const importAuto: ToolDefinition = {
 };
 
 export const importCancel: ToolDefinition = {
-  name: "import_cancel",
+  name: "cancel_import",
   description:
-    "Cancels a SCHEDULED or IN_PROGRESS import. Already-imported rows are NOT rolled back — use import_revert for that. Returns the updated import status.",
+    "Cancels a SCHEDULED or IN_PROGRESS import. Already-imported rows are NOT rolled back — use revert_import for that. Returns the updated import status.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      importId: { type: "string", description: "Import id from imports_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      importId: { type: "string", description: "Import id from list_imports." },
     },
     required: ["companyId", "importId"],
     additionalProperties: false,
@@ -301,14 +301,14 @@ export const importCancel: ToolDefinition = {
 };
 
 export const importRevert: ToolDefinition = {
-  name: "import_revert",
+  name: "revert_import",
   description:
     "Reverts a FINISHED or FINISHED_WITH_WARNINGS import — deletes the QuickBooks/Xero entries the import created, using their live SyncTokens. Status transitions FINISHED → REVERTING → REVERTED. Confirm with the user before calling — irreversible from their perspective.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      importId: { type: "string", description: "Import id from imports_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      importId: { type: "string", description: "Import id from list_imports." },
     },
     required: ["companyId", "importId"],
     additionalProperties: false,

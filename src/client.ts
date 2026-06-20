@@ -3,7 +3,7 @@ import { ApiError, buildApiError } from "./errors.js";
 
 const DEFAULT_BASE_URL = "https://importer.synder.com/api/v1";
 const USER_AGENT = "gl-importer-mcp/0.1.0";
-const RATE_LIMIT_MAX_ATTEMPTS = 3;
+const DEFAULT_MAX_RETRIES = 3;
 const RATE_LIMIT_TOTAL_CAP_MS = 60_000;
 const RATE_LIMIT_INITIAL_BACKOFF_MS = 2_000;
 
@@ -12,6 +12,10 @@ export interface ClientOptions {
   token: string;
   fetchImpl?: typeof fetch;
   log?: (line: string) => void;
+  /** Per-request timeout in ms. 0/undefined disables. */
+  requestTimeoutMs?: number;
+  /** Override for 429 retry attempt count. Default 3. */
+  maxRetries?: number;
 }
 
 export interface RequestOptions {
@@ -31,12 +35,16 @@ export class ImporterClient {
   private readonly token: string;
   private readonly fetchImpl: typeof fetch;
   private readonly log: (line: string) => void;
+  private readonly requestTimeoutMs: number;
+  private readonly maxRetries: number;
 
   constructor(opts: ClientOptions) {
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.token = opts.token;
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.log = opts.log ?? (() => {});
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? 0;
+    this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   }
 
   async request<T>(opts: RequestOptions): Promise<T> {
@@ -70,27 +78,42 @@ export class ImporterClient {
           : JSON.stringify(opts.body);
 
       let res: Response;
+      const abortController =
+        this.requestTimeoutMs > 0 ? new AbortController() : undefined;
+      const abortTimer = abortController
+        ? setTimeout(() => abortController.abort(), this.requestTimeoutMs)
+        : undefined;
       try {
         res = await this.fetchImpl(url, {
           method,
           headers,
           body: requestBody,
+          ...(abortController ? { signal: abortController.signal } : {}),
         });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.log(`[gl-importer] ${method} ${opts.path} → NETWORK_ERROR (${msg})`);
+        const timedOut = abortController?.signal.aborted === true;
+        this.log(
+          `[gl-importer] ${method} ${opts.path} → ${timedOut ? "TIMEOUT" : "NETWORK_ERROR"} (${msg})`,
+        );
         throw new ApiError({
-          code: "NETWORK_ERROR",
+          code: timedOut ? "TIMEOUT" : "NETWORK_ERROR",
           httpStatus: 0,
-          message: msg,
-          hint: "Check connectivity to importer.synder.com.",
+          message: timedOut
+            ? `Request exceeded ${this.requestTimeoutMs}ms timeout`
+            : msg,
+          hint: timedOut
+            ? "Increase IMPORTER_REQUEST_TIMEOUT_MS or check importer.synder.com."
+            : "Check connectivity to importer.synder.com.",
         });
+      } finally {
+        if (abortTimer) clearTimeout(abortTimer);
       }
 
       const ms = Date.now() - start;
       this.log(`[gl-importer] ${method} ${opts.path} → ${res.status} (${ms}ms)`);
 
-      if (res.status === 429 && attempt < RATE_LIMIT_MAX_ATTEMPTS) {
+      if (res.status === 429 && attempt < this.maxRetries) {
         const retryAfter = res.headers.get("retry-after");
         const backoff = retryAfter
           ? Math.max(0, Number(retryAfter) * 1000)
@@ -99,7 +122,7 @@ export class ImporterClient {
           break;
         }
         this.log(
-          `[gl-importer] ${method} ${opts.path} → 429 (retry ${attempt}/${RATE_LIMIT_MAX_ATTEMPTS}, waiting ${backoff}ms)`,
+          `[gl-importer] ${method} ${opts.path} → 429 (retry ${attempt}/${this.maxRetries}, waiting ${backoff}ms)`,
         );
         await sleep(backoff);
         waitedMs += backoff;
@@ -121,7 +144,7 @@ export class ImporterClient {
 
     throw buildApiError(
       429,
-      `Rate-limited after ${RATE_LIMIT_MAX_ATTEMPTS} attempts (cap ${RATE_LIMIT_TOTAL_CAP_MS / 1000}s).`,
+      `Rate-limited after ${this.maxRetries} attempts (cap ${RATE_LIMIT_TOTAL_CAP_MS / 1000}s).`,
     );
   }
 

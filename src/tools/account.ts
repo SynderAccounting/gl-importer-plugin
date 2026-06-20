@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "./types.js";
 
 export const accountGet: ToolDefinition = {
-  name: "account_get",
+  name: "get_account",
   description:
     "Returns the current Synder Importer account: email, name, status, subscription, and connected-company count. Call this first to verify the IMPORTER_API_TOKEN is valid.",
   inputSchema: {

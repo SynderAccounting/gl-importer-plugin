@@ -77,13 +77,13 @@ The MCP server exposes 19 tools. The ones an LLM will hit most often:
 | Tool | Purpose |
 |---|---|
 | `import_csv` | **Happy path.** Auto-resolves company, uploads file, runs dry-run, then (on confirm) executes + waits. |
-| `import_wait` | Polls a running import to a terminal state with exponential backoff (2s → 1.5× → 30s cap). |
-| `companies_list` / `entities_list` / `fields_get` | Discover what you can import where. |
-| `mappings_list` / `mapping_create` / `mapping_update` / `mapping_delete` | Saved-mapping CRUD. |
-| `import_auto` / `import_execute` | Lower-level: create an import with auto-mapping or an explicit mapping. |
-| `import_status` / `import_results` / `import_cancel` / `import_revert` | Lifecycle. |
-| `settings_get` / `settings_update` | Per-company import settings. |
-| `account_get` | Whoami / token check. |
+| `wait_for_import` | Polls a running import to a terminal state with exponential backoff (2s → 1.5× → 30s cap). |
+| `list_companies` / `list_entities` / `get_fields` | Discover what you can import where. |
+| `list_mappings` / `create_mapping` / `update_mapping` / `delete_mapping` | Saved-mapping CRUD. |
+| `auto_import` / `execute_import` | Lower-level: create an import with auto-mapping or an explicit mapping. |
+| `get_import_status` / `get_import_results` / `cancel_import` / `revert_import` | Lifecycle. |
+| `get_settings` / `update_settings` | Per-company import settings. |
+| `get_account` | Whoami / token check. |
 
 Full schemas are emitted at MCP startup — the agent skill (`skills/gl-importer/SKILL.md`)
 also documents the conventions.

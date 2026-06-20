@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "./types.js";
 
 export const companiesList: ToolDefinition = {
-  name: "companies_list",
+  name: "list_companies",
   description:
     "Lists all accounting companies connected to the Importer account (QuickBooks Online via 'intuit', Xero via 'xero'). Use the returned 'id' as companyId for downstream tools.",
   inputSchema: {
@@ -42,13 +42,13 @@ export const companiesList: ToolDefinition = {
 };
 
 export const settingsGet: ToolDefinition = {
-  name: "settings_get",
+  name: "get_settings",
   description:
     "Returns per-company import settings (dateFormat, document-number behavior, product/account auto-creation, duplicate-skip). Check dateFormat before importing — CSV date columns must match.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
     },
     required: ["companyId"],
     additionalProperties: false,
@@ -77,13 +77,13 @@ export const settingsGet: ToolDefinition = {
 };
 
 export const settingsUpdate: ToolDefinition = {
-  name: "settings_update",
+  name: "update_settings",
   description:
-    "Updates per-company import settings. Pass only the fields you want to change inside 'settings' (e.g. { dateFormat: 'dd/MM/yyyy' }). Fetch current values with settings_get first so you don't clobber unrelated fields. Returns the updated settings.",
+    "Updates per-company import settings. Pass only the fields you want to change inside 'settings' (e.g. { dateFormat: 'dd/MM/yyyy' }). Fetch current values with get_settings first so you don't clobber unrelated fields. Returns the updated settings.",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
+      companyId: { type: "string", description: "Company id from list_companies." },
       settings: {
         type: "object",
         description:

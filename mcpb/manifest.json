@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "gl-importer-mcp",
   "display_name": "Synder gl-importer (QuickBooks/Xero)",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API.",
   "long_description": "Official MCP server from Synder. Exposes the Synder Importer REST API as 19 tools covering accounts, companies, settings, entities, fields, field-mapping rules, post-import rules, imports, status polling, results, cancel, and revert. Same engine that thousands of bookkeepers use through the Synder web app, now callable from Claude, Cursor, and any other MCP-compatible host.\n\n**Typical flow:** Paste a CSV path, tell the model what entity you're importing (Invoice, Bill, JournalEntry, etc.), and the model walks the full pipeline \u2014 column-to-field mapping, validation, dry-run, commit. Mapping rules are persisted per company so the next import is one step.\n\nRepo: https://github.com/SynderAccounting/gl-importer-plugin\nDocs: https://importer.synder.com",
   "author": {
@@ -40,7 +40,10 @@
       ],
       "env": {
         "IMPORTER_API_TOKEN": "${user_config.importer_api_token}",
-        "IMPORTER_BASE_URL": "${user_config.importer_base_url}"
+        "IMPORTER_BASE_URL": "${user_config.importer_base_url}",
+        "IMPORTER_REQUEST_TIMEOUT_MS": "${user_config.importer_request_timeout_ms}",
+        "IMPORTER_LOG_LEVEL": "${user_config.importer_log_level}",
+        "IMPORTER_MAX_RETRIES": "${user_config.importer_max_retries}"
       }
     }
   },
@@ -58,6 +61,27 @@
       "description": "Override for staging/test. Leave the default for production.",
       "default": "https://importer.synder.com/api/v1",
       "required": false
+    },
+    "importer_request_timeout_ms": {
+      "type": "number",
+      "title": "Request Timeout (ms)",
+      "description": "Per-HTTP-request timeout in milliseconds. Default 30000 (30s).",
+      "default": 30000,
+      "required": false
+    },
+    "importer_log_level": {
+      "type": "string",
+      "title": "Log Level",
+      "description": "MCP server log verbosity: 'error', 'warn', 'info', 'debug'. Default 'info'.",
+      "default": "info",
+      "required": false
+    },
+    "importer_max_retries": {
+      "type": "number",
+      "title": "Max Request Retries",
+      "description": "Retries on transient HTTP failures (5xx, network). Default 2.",
+      "default": 2,
+      "required": false
     }
   },
   "compatibility": {
@@ -73,7 +97,7 @@
   },
   "tools": [
     {
-      "name": "account_get",
+      "name": "get_account",
       "description": "Returns the current Synder Importer account: email, name, status, subscription, and connected-company count. Call this first to verify the IMPORTER_API_TOKEN is valid.",
       "inputSchema": {
         "type": "object",
@@ -119,7 +143,7 @@
       }
     },
     {
-      "name": "companies_list",
+      "name": "list_companies",
       "description": "Lists all accounting companies connected to the Importer account (QuickBooks Online via 'intuit', Xero via 'xero'). Use the returned 'id' as companyId for downstream tools.",
       "inputSchema": {
         "type": "object",
@@ -171,14 +195,14 @@
       }
     },
     {
-      "name": "settings_get",
+      "name": "get_settings",
       "description": "Returns per-company import settings (dateFormat, document-number behavior, product/account auto-creation, duplicate-skip). Check dateFormat before importing \u2014 CSV date columns must match.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           }
         },
         "required": [
@@ -220,14 +244,14 @@
       }
     },
     {
-      "name": "settings_update",
-      "description": "Updates per-company import settings. Pass only the fields you want to change inside 'settings' (e.g. { dateFormat: 'dd/MM/yyyy' }). Fetch current values with settings_get first so you don't clobber unrelated fields. Returns the updated settings.",
+      "name": "update_settings",
+      "description": "Updates per-company import settings. Pass only the fields you want to change inside 'settings' (e.g. { dateFormat: 'dd/MM/yyyy' }). Fetch current values with get_settings first so you don't clobber unrelated fields. Returns the updated settings.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "settings": {
             "type": "object",
@@ -272,14 +296,14 @@
       }
     },
     {
-      "name": "entities_list",
-      "description": "Lists importable entity types for a company (Invoice, Bill, JournalEntry, Customer, Vendor, etc.). Use the returned 'name' as entityName for fields_get and import tools.",
+      "name": "list_entities",
+      "description": "Lists importable entity types for a company (Invoice, Bill, JournalEntry, Customer, Vendor, etc.). Use the returned 'name' as entityName for get_fields and import tools.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           }
         },
         "required": [
@@ -322,18 +346,18 @@
       }
     },
     {
-      "name": "fields_get",
+      "name": "get_fields",
       "description": "Returns the field schema for an entity in a company: every field with its type, required flag, alternativeTitles, and predefinedValues. Use to build or verify a mapping before running an import.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "entityName": {
             "type": "string",
-            "description": "Entity name from entities_list (e.g., 'Invoice', 'Bill')."
+            "description": "Entity name from list_entities (e.g., 'Invoice', 'Bill')."
           }
         },
         "required": [
@@ -353,7 +377,7 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "description": "Field id \u2014 pass as targetFieldId in mapping_create/update."
+                  "description": "Field id \u2014 pass as targetFieldId in create_mapping/update."
                 },
                 "name": {
                   "type": "string",
@@ -401,14 +425,14 @@
       }
     },
     {
-      "name": "mappings_list",
+      "name": "list_mappings",
       "description": "Lists field mappings saved for a company. Each mapping is reusable across imports of the same entity type.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           }
         },
         "required": [
@@ -490,14 +514,14 @@
       }
     },
     {
-      "name": "mapping_create",
-      "description": "Creates a new field mapping for an entity (e.g. 'Journal Entry', 'Bill', 'Invoice'). Look up valid target fields with fields_get first. Returns the created mapping including its id.",
+      "name": "create_mapping",
+      "description": "Creates a new field mapping for an entity (e.g. 'Journal Entry', 'Bill', 'Invoice'). Look up valid target fields with get_fields first. Returns the created mapping including its id.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "title": {
             "type": "string",
@@ -505,7 +529,7 @@
           },
           "entityName": {
             "type": "string",
-            "description": "Entity this mapping targets \u2014 must match entities_list output (e.g. 'Journal Entry')."
+            "description": "Entity this mapping targets \u2014 must match list_entities output (e.g. 'Journal Entry')."
           },
           "fields": {
             "type": "array",
@@ -516,7 +540,7 @@
               "properties": {
                 "targetFieldId": {
                   "type": "string",
-                  "description": "Importer field id from fields_get for the target entity."
+                  "description": "Importer field id from get_fields for the target entity."
                 },
                 "sourceFieldTitle": {
                   "type": "string",
@@ -606,18 +630,18 @@
       }
     },
     {
-      "name": "mapping_update",
-      "description": "Replaces an existing mapping in full. Fetch the current mapping with mappings_list first and send the whole desired shape \u2014 this is a PUT, not a patch. Returns the updated mapping.",
+      "name": "update_mapping",
+      "description": "Replaces an existing mapping in full. Fetch the current mapping with list_mappings first and send the whole desired shape \u2014 this is a PUT, not a patch. Returns the updated mapping.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "mappingId": {
             "type": "string",
-            "description": "Mapping id from mappings_list."
+            "description": "Mapping id from list_mappings."
           },
           "title": {
             "type": "string",
@@ -625,7 +649,7 @@
           },
           "entityName": {
             "type": "string",
-            "description": "Entity this mapping targets \u2014 must match entities_list output."
+            "description": "Entity this mapping targets \u2014 must match list_entities output."
           },
           "fields": {
             "type": "array",
@@ -636,7 +660,7 @@
               "properties": {
                 "targetFieldId": {
                   "type": "string",
-                  "description": "Importer field id from fields_get for the target entity."
+                  "description": "Importer field id from get_fields for the target entity."
                 },
                 "sourceFieldTitle": {
                   "type": "string",
@@ -727,18 +751,18 @@
       }
     },
     {
-      "name": "mapping_delete",
+      "name": "delete_mapping",
       "description": "Deletes a saved mapping. Irreversible. Imports that referenced this mapping keep their historical record but new imports can no longer pick it.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "mappingId": {
             "type": "string",
-            "description": "Mapping id from mappings_list."
+            "description": "Mapping id from list_mappings."
           }
         },
         "required": [
@@ -774,14 +798,14 @@
       }
     },
     {
-      "name": "imports_list",
+      "name": "list_imports",
       "description": "Lists recent imports for a company with status and timestamps. Use to find an importId for status / results / revert / cancel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           }
         },
         "required": [
@@ -860,18 +884,18 @@
       }
     },
     {
-      "name": "import_status",
+      "name": "get_import_status",
       "description": "Returns a single import's current status and summary (total / succeeded / failed / warnings). Status lifecycle: SCHEDULED \u2192 IN_PROGRESS \u2192 FINISHED | FINISHED_WITH_WARNINGS | FAILED | CANCELED. FINISHED can transition to REVERTING \u2192 REVERTED.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "importId": {
             "type": "string",
-            "description": "Import id from imports_list."
+            "description": "Import id from list_imports."
           }
         },
         "required": [
@@ -941,18 +965,18 @@
       }
     },
     {
-      "name": "import_results",
+      "name": "get_import_results",
       "description": "Returns per-row results for a finished import. Filter by 'type' (INFO / WARNING / ERROR) to surface only failures. Paginated \u2014 defaults to 20 rows per page, max 100.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "importId": {
             "type": "string",
-            "description": "Import id from imports_list."
+            "description": "Import id from list_imports."
           },
           "type": {
             "type": "string",
@@ -1045,14 +1069,14 @@
       }
     },
     {
-      "name": "import_execute",
-      "description": "Uploads a CSV/XLSX file and starts an import using an existing mapping. The MCP server reads the file from disk \u2014 pass an absolute path. Returns the created import object including importId. Status starts as SCHEDULED \u2014 poll import_status or use import_wait. Limits: .csv/.xlsx/.xls only, 50MB max.",
+      "name": "execute_import",
+      "description": "Uploads a CSV/XLSX file and starts an import using an existing mapping. The MCP server reads the file from disk \u2014 pass an absolute path. Returns the created import object including importId. Status starts as SCHEDULED \u2014 poll get_import_status or use wait_for_import. Limits: .csv/.xlsx/.xls only, 50MB max.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "filePath": {
             "type": "string",
@@ -1060,11 +1084,11 @@
           },
           "entityName": {
             "type": "string",
-            "description": "Entity to import as \u2014 must match entities_list (e.g. 'Journal Entry')."
+            "description": "Entity to import as \u2014 must match list_entities (e.g. 'Journal Entry')."
           },
           "mappingId": {
             "type": "string",
-            "description": "Mapping id from mappings_list to apply to the file."
+            "description": "Mapping id from list_mappings to apply to the file."
           }
         },
         "required": [
@@ -1137,14 +1161,14 @@
       }
     },
     {
-      "name": "import_auto",
+      "name": "auto_import",
       "description": "Uploads a file and asks the server to auto-map columns to the target entity. Set dryRun=true to get the proposed mapping back without creating an import \u2014 useful for showing the user what will happen and asking 'does this look right?' before committing. Set dryRun=false (default) to auto-map and import in one call.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "filePath": {
             "type": "string",
@@ -1152,7 +1176,7 @@
           },
           "entityName": {
             "type": "string",
-            "description": "Entity to import as \u2014 must match entities_list output."
+            "description": "Entity to import as \u2014 must match list_entities output."
           },
           "dryRun": {
             "type": "boolean",
@@ -1209,18 +1233,18 @@
       }
     },
     {
-      "name": "import_cancel",
-      "description": "Cancels a SCHEDULED or IN_PROGRESS import. Already-imported rows are NOT rolled back \u2014 use import_revert for that. Returns the updated import status.",
+      "name": "cancel_import",
+      "description": "Cancels a SCHEDULED or IN_PROGRESS import. Already-imported rows are NOT rolled back \u2014 use revert_import for that. Returns the updated import status.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "importId": {
             "type": "string",
-            "description": "Import id from imports_list."
+            "description": "Import id from list_imports."
           }
         },
         "required": [
@@ -1291,18 +1315,18 @@
       }
     },
     {
-      "name": "import_revert",
+      "name": "revert_import",
       "description": "Reverts a FINISHED or FINISHED_WITH_WARNINGS import \u2014 deletes the QuickBooks/Xero entries the import created, using their live SyncTokens. Status transitions FINISHED \u2192 REVERTING \u2192 REVERTED. Confirm with the user before calling \u2014 irreversible from their perspective.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "importId": {
             "type": "string",
-            "description": "Import id from imports_list."
+            "description": "Import id from list_imports."
           }
         },
         "required": [
@@ -1373,18 +1397,18 @@
       }
     },
     {
-      "name": "import_wait",
-      "description": "Polls import_status until the import reaches a terminal state (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED). Exponential backoff (2s \u2192 1.5\u00d7 \u2192 cap 30s). Default timeout 600s \u2014 if exceeded, returns { status: 'POLLING', importId, lastSeen } so the LLM can re-call. Includes a per-type result count summary on terminal states (INFO / WARNING / ERROR; null if the server didn't return totals).",
+      "name": "wait_for_import",
+      "description": "Polls get_import_status until the import reaches a terminal state (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED). Exponential backoff (2s \u2192 1.5\u00d7 \u2192 cap 30s). Default timeout 600s \u2014 if exceeded, returns { status: 'POLLING', importId, lastSeen } so the LLM can re-call. Includes a per-type result count summary on terminal states (INFO / WARNING / ERROR; null if the server didn't return totals).",
       "inputSchema": {
         "type": "object",
         "properties": {
           "companyId": {
             "type": "string",
-            "description": "Company id from companies_list."
+            "description": "Company id from list_companies."
           },
           "importId": {
             "type": "string",
-            "description": "Import id from imports_list or import_execute."
+            "description": "Import id from list_imports or execute_import."
           },
           "timeoutSeconds": {
             "type": "integer",
@@ -1412,7 +1436,7 @@
           },
           "importId": {
             "type": "string",
-            "description": "Echoed back when status='POLLING' so the LLM can re-call import_wait."
+            "description": "Echoed back when status='POLLING' so the LLM can re-call wait_for_import."
           },
           "summary": {
             "type": "object",
@@ -1441,7 +1465,7 @@
           },
           "lastSeen": {
             "type": "object",
-            "description": "Last import_status response observed before the timeout, present when status='POLLING'.",
+            "description": "Last get_import_status response observed before the timeout, present when status='POLLING'.",
             "additionalProperties": true
           }
         },
@@ -1466,7 +1490,7 @@
           },
           "entityName": {
             "type": "string",
-            "description": "Entity to import as \u2014 match entities_list (e.g. 'Journal Entry')."
+            "description": "Entity to import as \u2014 match list_entities (e.g. 'Journal Entry')."
           },
           "companyId": {
             "type": "string",
@@ -1480,7 +1504,7 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 3600,
-            "description": "Forwarded to import_wait on the confirmed call. Default 600."
+            "description": "Forwarded to wait_for_import on the confirmed call. Default 600."
           }
         },
         "required": [

@@ -7,6 +7,7 @@ export type ErrorCode =
   | "RATE_LIMITED"
   | "SERVER_ERROR"
   | "NETWORK_ERROR"
+  | "TIMEOUT"
   | "CLIENT_ERROR";
 
 export class ApiError extends Error {
@@ -48,6 +49,8 @@ const HINTS: Record<ErrorCode, string> = {
   SERVER_ERROR: "Importer API returned 5xx. Try again in a moment.",
   NETWORK_ERROR:
     "Network failure reaching importer.synder.com. Check connectivity.",
+  TIMEOUT:
+    "Request exceeded the configured timeout. Increase IMPORTER_REQUEST_TIMEOUT_MS.",
   CLIENT_ERROR: "Unexpected client error. See message above.",
 };
 

@@ -10,10 +10,29 @@ import { ApiError } from "./errors.js";
 import { TOOLS, findTool } from "./tools/registry.js";
 
 const SERVER_NAME = "gl-importer";
-const SERVER_VERSION = "0.1.4";
+const SERVER_VERSION = "0.1.5";
 
-function log(line: string): void {
-  process.stderr.write(`${line}\n`);
+const LOG_LEVELS = ["error", "warn", "info", "debug"] as const;
+type LogLevel = (typeof LOG_LEVELS)[number];
+
+function resolveLogLevel(): LogLevel {
+  const raw = (process.env.IMPORTER_LOG_LEVEL ?? "info").toLowerCase();
+  return (LOG_LEVELS as readonly string[]).includes(raw) ? (raw as LogLevel) : "info";
+}
+
+const CURRENT_LOG_LEVEL = resolveLogLevel();
+const LOG_LEVEL_RANK: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 };
+
+function log(line: string, level: LogLevel = "info"): void {
+  if (LOG_LEVEL_RANK[level] <= LOG_LEVEL_RANK[CURRENT_LOG_LEVEL]) {
+    process.stderr.write(`${line}\n`);
+  }
+}
+
+function parsePositiveInt(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 function makeUnauthorizedError(): ApiError {
@@ -42,12 +61,14 @@ async function validateTokenAtStartup(client: ImporterClient): Promise<void> {
 async function main(): Promise<void> {
   const token = process.env.IMPORTER_API_TOKEN ?? "";
   const baseUrl = process.env.IMPORTER_BASE_URL;
+  const requestTimeoutMs = parsePositiveInt(process.env.IMPORTER_REQUEST_TIMEOUT_MS);
+  const maxRetries = parsePositiveInt(process.env.IMPORTER_MAX_RETRIES);
 
   if (!token) {
-    log(`[gl-importer] ERROR: IMPORTER_API_TOKEN not set — all tool calls will fail`);
+    log(`[gl-importer] ERROR: IMPORTER_API_TOKEN not set — all tool calls will fail`, "error");
   }
 
-  const client = new ImporterClient({ token, baseUrl, log });
+  const client = new ImporterClient({ token, baseUrl, log, requestTimeoutMs, maxRetries });
 
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },

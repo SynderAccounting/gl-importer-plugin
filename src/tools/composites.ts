@@ -45,21 +45,21 @@ async function summarizeResults(
       const total = page.pagination?.total;
       summary[type] = typeof total === "number" ? total : page.data?.length ?? 0;
     } catch {
-      // Leave as null — server may not support the count yet; LLM can call import_results directly.
+      // Leave as null — server may not support the count yet; LLM can call get_import_results directly.
     }
   }
   return summary;
 }
 
 export const importWait: ToolDefinition = {
-  name: "import_wait",
+  name: "wait_for_import",
   description:
-    "Polls import_status until the import reaches a terminal state (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED). Exponential backoff (2s → 1.5× → cap 30s). Default timeout 600s — if exceeded, returns { status: 'POLLING', importId, lastSeen } so the LLM can re-call. Includes a per-type result count summary on terminal states (INFO / WARNING / ERROR; null if the server didn't return totals).",
+    "Polls get_import_status until the import reaches a terminal state (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED). Exponential backoff (2s → 1.5× → cap 30s). Default timeout 600s — if exceeded, returns { status: 'POLLING', importId, lastSeen } so the LLM can re-call. Includes a per-type result count summary on terminal states (INFO / WARNING / ERROR; null if the server didn't return totals).",
   inputSchema: {
     type: "object",
     properties: {
-      companyId: { type: "string", description: "Company id from companies_list." },
-      importId: { type: "string", description: "Import id from imports_list or import_execute." },
+      companyId: { type: "string", description: "Company id from list_companies." },
+      importId: { type: "string", description: "Import id from list_imports or execute_import." },
       timeoutSeconds: {
         type: "integer",
         minimum: 1,
@@ -80,7 +80,7 @@ export const importWait: ToolDefinition = {
       },
       importId: {
         type: "string",
-        description: "Echoed back when status='POLLING' so the LLM can re-call import_wait.",
+        description: "Echoed back when status='POLLING' so the LLM can re-call wait_for_import.",
       },
       summary: {
         type: "object",
@@ -94,7 +94,7 @@ export const importWait: ToolDefinition = {
       },
       lastSeen: {
         type: "object",
-        description: "Last import_status response observed before the timeout, present when status='POLLING'.",
+        description: "Last get_import_status response observed before the timeout, present when status='POLLING'.",
         additionalProperties: true,
       },
     },
@@ -180,7 +180,7 @@ export const importCsv: ToolDefinition = {
       filePath: { type: "string", description: "Absolute path to a .csv, .xlsx, or .xls file." },
       entityName: {
         type: "string",
-        description: "Entity to import as — match entities_list (e.g. 'Journal Entry').",
+        description: "Entity to import as — match list_entities (e.g. 'Journal Entry').",
       },
       companyId: {
         type: "string",
@@ -194,7 +194,7 @@ export const importCsv: ToolDefinition = {
         type: "integer",
         minimum: 1,
         maximum: 3600,
-        description: "Forwarded to import_wait on the confirmed call. Default 600.",
+        description: "Forwarded to wait_for_import on the confirmed call. Default 600.",
       },
     },
     required: ["filePath", "entityName"],
