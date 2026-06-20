@@ -29,8 +29,9 @@ for d in @vitest @jest @rollup @esbuild; do
   rm -rf "$STAGE/node_modules/$d"
 done
 
-echo "==> Packing"
-npx -y @anthropic-ai/mcpb pack "$STAGE" "$OUT"
+echo "==> Packing (raw zip; bypasses MCPB strict schema so tools[].inputSchema survives)"
+rm -f "$OUT"
+(cd "$STAGE" && zip -r -q "$OUT" .)
 
 echo "==> Done: $OUT"
 ls -lh "$OUT"
