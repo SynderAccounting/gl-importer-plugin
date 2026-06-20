@@ -10,7 +10,7 @@ import { ApiError } from "./errors.js";
 import { TOOLS, findTool } from "./tools/registry.js";
 
 const SERVER_NAME = "gl-importer";
-const SERVER_VERSION = "0.1.0";
+const SERVER_VERSION = "0.1.1";
 
 function log(line: string): void {
   process.stderr.write(`${line}\n`);

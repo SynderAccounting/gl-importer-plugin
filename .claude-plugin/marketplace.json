@@ -11,7 +11,7 @@
       "name": "gl-importer",
       "source": "./",
       "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API. Bundles an MCP server (full read+write, 19 tools) plus the gl-importer agent skill.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Synder",
         "email": "help@synder.com"

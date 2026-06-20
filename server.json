@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.synder/gl-importer-mcp",
+  "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API.",
+  "repository": {
+    "url": "https://github.com/SynderAccounting/gl-importer-plugin",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@cloudbusiness/gl-importer-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "IMPORTER_API_TOKEN",
+          "description": "Bearer token for the Synder Importer API. Generate at importer.synder.com -> Account -> API Keys.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "IMPORTER_BASE_URL",
+          "description": "Override API base URL (for staging/test). Defaults to https://importer.synder.com/api/v1.",
+          "isRequired": false,
+          "format": "string",
+          "default": "https://importer.synder.com/api/v1"
+        }
+      ]
+    }
+  ]
+}
