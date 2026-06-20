@@ -1,5 +1,30 @@
 import type { ToolDefinition } from "./types.js";
 
+const MAPPING_FIELD_SHAPE = {
+  type: "object",
+  properties: {
+    targetFieldId: { type: "string", description: "Importer field id." },
+    sourceFieldTitle: { type: "string", description: "CSV column the field reads from." },
+    fixedValue: { description: "Constant applied to every row, if not mapped from a column." },
+  },
+  required: ["targetFieldId"],
+  additionalProperties: true,
+} as const;
+
+const MAPPING_OUTPUT_SHAPE = {
+  type: "object",
+  properties: {
+    id: { type: "string", description: "Mapping id." },
+    title: { type: "string", description: "Mapping name." },
+    entityName: { type: "string", description: "Entity this mapping targets." },
+    fields: { type: "array", description: "Persisted field entries.", items: MAPPING_FIELD_SHAPE },
+    createdAt: { type: "string", description: "ISO timestamp." },
+    updatedAt: { type: "string", description: "ISO timestamp." },
+  },
+  required: ["id", "title", "entityName", "fields"],
+  additionalProperties: true,
+} as const;
+
 export const mappingsList: ToolDefinition = {
   name: "mappings_list",
   description:
@@ -11,6 +36,19 @@ export const mappingsList: ToolDefinition = {
     },
     required: ["companyId"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      mappings: { type: "array", description: "Saved field mappings.", items: MAPPING_OUTPUT_SHAPE },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "List saved field mappings",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
@@ -61,6 +99,14 @@ export const mappingCreate: ToolDefinition = {
     required: ["companyId", "title", "entityName", "fields"],
     additionalProperties: false,
   },
+  outputSchema: MAPPING_OUTPUT_SHAPE,
+  annotations: {
+    title: "Create field mapping",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
     return client.request({
@@ -98,6 +144,14 @@ export const mappingUpdate: ToolDefinition = {
     required: ["companyId", "mappingId", "title", "entityName", "fields"],
     additionalProperties: false,
   },
+  outputSchema: MAPPING_OUTPUT_SHAPE,
+  annotations: {
+    title: "Replace existing mapping",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
     const mappingId = String(input.mappingId);
@@ -125,6 +179,22 @@ export const mappingDelete: ToolDefinition = {
     },
     required: ["companyId", "mappingId"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      deleted: { type: "boolean", description: "True if the mapping was deleted." },
+      mappingId: { type: "string", description: "Id of the deleted mapping." },
+    },
+    required: ["deleted", "mappingId"],
+    additionalProperties: false,
+  },
+  annotations: {
+    title: "Delete saved mapping",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);

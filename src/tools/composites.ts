@@ -70,6 +70,42 @@ export const importWait: ToolDefinition = {
     required: ["companyId", "importId"],
     additionalProperties: false,
   },
+  outputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "Import id." },
+      status: {
+        type: "string",
+        description: "Either a terminal status (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED) or 'POLLING' if timeoutSeconds elapsed.",
+      },
+      importId: {
+        type: "string",
+        description: "Echoed back when status='POLLING' so the LLM can re-call import_wait.",
+      },
+      summary: {
+        type: "object",
+        description: "Per-type result counts on terminal states. Values may be null if the server didn't return totals.",
+        properties: {
+          INFO: { type: ["integer", "null"] },
+          WARNING: { type: ["integer", "null"] },
+          ERROR: { type: ["integer", "null"] },
+        },
+        additionalProperties: false,
+      },
+      lastSeen: {
+        type: "object",
+        description: "Last import_status response observed before the timeout, present when status='POLLING'.",
+        additionalProperties: true,
+      },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Wait for import to terminate",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   handler: async (input, ctx) => {
     const companyId = String(input.companyId);
     const importId = String(input.importId);
@@ -163,6 +199,45 @@ export const importCsv: ToolDefinition = {
     },
     required: ["filePath", "entityName"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      stage: {
+        type: "string",
+        enum: ["DRY_RUN", "DONE"],
+        description: "DRY_RUN when confirmed=false (first call); DONE when confirmed=true.",
+      },
+      companyId: { type: "string" },
+      entityName: { type: "string" },
+      importId: { type: "string", description: "Present when stage=DONE." },
+      status: { type: "string", description: "Final import status (stage=DONE)." },
+      proposedMapping: {
+        type: "object",
+        description: "Auto-resolved column→field mapping (stage=DRY_RUN).",
+        additionalProperties: true,
+      },
+      missingRequired: {
+        type: "array",
+        items: { type: "string" },
+        description: "Required target fields the auto-mapper could not resolve (stage=DRY_RUN).",
+      },
+      summary: {
+        type: "object",
+        description: "Per-type result counts when stage=DONE and the import reached a terminal state.",
+        additionalProperties: true,
+      },
+      hint: { type: "string", description: "Next-step hint for the LLM." },
+    },
+    required: ["stage"],
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Happy-path CSV/XLSX importer (dry-run then commit)",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
   },
   handler: async (input, ctx) => {
     const filePath = String(input.filePath);

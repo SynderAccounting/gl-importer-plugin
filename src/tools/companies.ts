@@ -9,6 +9,33 @@ export const companiesList: ToolDefinition = {
     properties: {},
     additionalProperties: false,
   },
+  outputSchema: {
+    type: "object",
+    properties: {
+      companies: {
+        type: "array",
+        description: "Connected accounting companies.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Company id — use as companyId for downstream tools." },
+            name: { type: "string", description: "Company display name." },
+            integration: { type: "string", description: "Accounting integration: 'intuit' (QuickBooks Online) or 'xero'." },
+            status: { type: "string", description: "Connection status (e.g. ACTIVE, EXPIRED)." },
+          },
+          required: ["id", "name", "integration"],
+          additionalProperties: true,
+        },
+      },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "List connected companies",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   handler: async (_input, { client }) => {
     return client.request({ path: "/companies" });
   },
@@ -25,6 +52,23 @@ export const settingsGet: ToolDefinition = {
     },
     required: ["companyId"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      dateFormat: { type: "string", description: "Date parse format (e.g. 'MM/dd/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd')." },
+      incrementDocNumber: { type: "boolean", description: "Auto-increment document numbers on conflict." },
+      createMissingProducts: { type: "boolean", description: "Create products in QBO/Xero if not found." },
+      createMissingAccounts: { type: "boolean", description: "Create chart-of-accounts entries if not found." },
+      skipDuplicates: { type: "boolean", description: "Skip rows that look like duplicates of existing entries." },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Get company import settings",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
@@ -49,6 +93,24 @@ export const settingsUpdate: ToolDefinition = {
     },
     required: ["companyId", "settings"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      dateFormat: { type: "string", description: "Date parse format." },
+      incrementDocNumber: { type: "boolean" },
+      createMissingProducts: { type: "boolean" },
+      createMissingAccounts: { type: "boolean" },
+      skipDuplicates: { type: "boolean" },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Update company import settings",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);

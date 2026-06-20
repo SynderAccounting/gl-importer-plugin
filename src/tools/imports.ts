@@ -1,6 +1,46 @@
 import type { ToolDefinition } from "./types.js";
 import { loadFileForUpload, buildImportFormData } from "../upload.js";
 
+const IMPORT_OBJECT_SHAPE = {
+  type: "object",
+  properties: {
+    id: { type: "string", description: "Import id." },
+    status: {
+      type: "string",
+      description: "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED).",
+    },
+    entityName: { type: "string", description: "Entity type being imported." },
+    fileName: { type: "string", description: "Uploaded file name." },
+    summary: {
+      type: "object",
+      description: "Counts per result type.",
+      properties: {
+        total: { type: "integer" },
+        succeeded: { type: "integer" },
+        failed: { type: "integer" },
+        warnings: { type: "integer" },
+      },
+      additionalProperties: true,
+    },
+    createdAt: { type: "string", description: "ISO timestamp." },
+    finishedAt: { type: "string", description: "ISO timestamp when reached terminal status, if applicable." },
+  },
+  required: ["id", "status"],
+  additionalProperties: true,
+} as const;
+
+const IMPORT_RESULT_ROW_SHAPE = {
+  type: "object",
+  properties: {
+    rowNumber: { type: "integer", description: "1-indexed row number in the source file." },
+    type: { type: "string", enum: ["INFO", "WARNING", "ERROR"] },
+    message: { type: "string", description: "Human-readable result message." },
+    createdEntityId: { type: "string", description: "QBO/Xero entity id created, if any." },
+  },
+  required: ["rowNumber", "type"],
+  additionalProperties: true,
+} as const;
+
 export const importsList: ToolDefinition = {
   name: "imports_list",
   description:
@@ -12,6 +52,19 @@ export const importsList: ToolDefinition = {
     },
     required: ["companyId"],
     additionalProperties: false,
+  },
+  outputSchema: {
+    type: "object",
+    properties: {
+      imports: { type: "array", description: "Recent imports.", items: IMPORT_OBJECT_SHAPE },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "List recent imports",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
@@ -31,6 +84,13 @@ export const importStatus: ToolDefinition = {
     },
     required: ["companyId", "importId"],
     additionalProperties: false,
+  },
+  outputSchema: IMPORT_OBJECT_SHAPE,
+  annotations: {
+    title: "Get import status",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
@@ -66,6 +126,23 @@ export const importResults: ToolDefinition = {
     required: ["companyId", "importId"],
     additionalProperties: false,
   },
+  outputSchema: {
+    type: "object",
+    properties: {
+      rows: { type: "array", description: "Per-row results.", items: IMPORT_RESULT_ROW_SHAPE },
+      page: { type: "integer", description: "Current page (1-indexed)." },
+      perPage: { type: "integer", description: "Rows per page." },
+      total: { type: "integer", description: "Total result rows across all pages." },
+      totalPages: { type: "integer", description: "Total page count." },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Get per-row import results",
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
     const importId = String(input.importId);
@@ -100,6 +177,14 @@ export const importExecute: ToolDefinition = {
     },
     required: ["companyId", "filePath", "entityName", "mappingId"],
     additionalProperties: false,
+  },
+  outputSchema: IMPORT_OBJECT_SHAPE,
+  annotations: {
+    title: "Execute file import with mapping",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
@@ -137,6 +222,38 @@ export const importAuto: ToolDefinition = {
     required: ["companyId", "filePath", "entityName"],
     additionalProperties: false,
   },
+  outputSchema: {
+    type: "object",
+    description:
+      "Either an import object (dryRun=false) or a proposed mapping with detected columns (dryRun=true).",
+    properties: {
+      id: { type: "string", description: "Import id (present when dryRun=false)." },
+      status: { type: "string", description: "Import status (present when dryRun=false)." },
+      proposedMapping: {
+        type: "object",
+        description: "Auto-resolved column→field mapping (present when dryRun=true).",
+        additionalProperties: true,
+      },
+      detectedColumns: {
+        type: "array",
+        items: { type: "string" },
+        description: "Headers found in the uploaded file (present when dryRun=true).",
+      },
+      missingRequired: {
+        type: "array",
+        items: { type: "string" },
+        description: "Required target fields the auto-mapper could not resolve.",
+      },
+    },
+    additionalProperties: true,
+  },
+  annotations: {
+    title: "Auto-map and import a file",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
     const file = await loadFileForUpload(String(input.filePath));
@@ -165,6 +282,14 @@ export const importCancel: ToolDefinition = {
     required: ["companyId", "importId"],
     additionalProperties: false,
   },
+  outputSchema: IMPORT_OBJECT_SHAPE,
+  annotations: {
+    title: "Cancel a running import",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);
     const importId = String(input.importId);
@@ -187,6 +312,14 @@ export const importRevert: ToolDefinition = {
     },
     required: ["companyId", "importId"],
     additionalProperties: false,
+  },
+  outputSchema: IMPORT_OBJECT_SHAPE,
+  annotations: {
+    title: "Revert finished import",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
   },
   handler: async (input, { client }) => {
     const companyId = String(input.companyId);

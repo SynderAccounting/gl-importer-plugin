@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "gl-importer-mcp",
   "display_name": "Synder gl-importer (QuickBooks/Xero)",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Import CSV/XLSX accounting data into QuickBooks Online or Xero via the Synder Importer API.",
   "long_description": "Official MCP server from Synder. Exposes the Synder Importer REST API as 19 tools covering accounts, companies, settings, entities, fields, field-mapping rules, post-import rules, imports, status polling, results, cancel, and revert. Same engine that thousands of bookkeepers use through the Synder web app, now callable from Claude, Cursor, and any other MCP-compatible host.\n\n**Typical flow:** Paste a CSV path, tell the model what entity you're importing (Invoice, Bill, JournalEntry, etc.), and the model walks the full pipeline \u2014 column-to-field mapping, validation, dry-run, commit. Mapping rules are persisted per company so the next import is one step.\n\nRepo: https://github.com/SynderAccounting/gl-importer-plugin\nDocs: https://importer.synder.com",
   "author": {
@@ -79,6 +79,43 @@
         "type": "object",
         "properties": {},
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Account id."
+          },
+          "email": {
+            "type": "string",
+            "description": "Account owner email."
+          },
+          "name": {
+            "type": "string",
+            "description": "Account owner full name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Account lifecycle status (e.g. ACTIVE, TRIAL, SUSPENDED)."
+          },
+          "subscription": {
+            "type": "object",
+            "description": "Subscription plan + billing fields.",
+            "additionalProperties": true
+          },
+          "connectedCompaniesCount": {
+            "type": "integer",
+            "description": "Number of accounting companies linked to this account."
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Get Synder Importer account",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -88,6 +125,49 @@
         "type": "object",
         "properties": {},
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "description": "Connected accounting companies.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Company id \u2014 use as companyId for downstream tools."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Company display name."
+                },
+                "integration": {
+                  "type": "string",
+                  "description": "Accounting integration: 'intuit' (QuickBooks Online) or 'xero'."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Connection status (e.g. ACTIVE, EXPIRED)."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "integration"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "List connected companies",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -105,6 +185,38 @@
           "companyId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dateFormat": {
+            "type": "string",
+            "description": "Date parse format (e.g. 'MM/dd/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd')."
+          },
+          "incrementDocNumber": {
+            "type": "boolean",
+            "description": "Auto-increment document numbers on conflict."
+          },
+          "createMissingProducts": {
+            "type": "boolean",
+            "description": "Create products in QBO/Xero if not found."
+          },
+          "createMissingAccounts": {
+            "type": "boolean",
+            "description": "Create chart-of-accounts entries if not found."
+          },
+          "skipDuplicates": {
+            "type": "boolean",
+            "description": "Skip rows that look like duplicates of existing entries."
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Get company import settings",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -128,6 +240,35 @@
           "settings"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dateFormat": {
+            "type": "string",
+            "description": "Date parse format."
+          },
+          "incrementDocNumber": {
+            "type": "boolean"
+          },
+          "createMissingProducts": {
+            "type": "boolean"
+          },
+          "createMissingAccounts": {
+            "type": "boolean"
+          },
+          "skipDuplicates": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Update company import settings",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
       }
     },
     {
@@ -145,6 +286,39 @@
           "companyId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entities": {
+            "type": "array",
+            "description": "Importable entity types for this company.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Entity name (use as entityName downstream)."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Human-readable entity name."
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "List importable entity types",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -167,6 +341,63 @@
           "entityName"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Field schema entries for the entity.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Field id \u2014 pass as targetFieldId in mapping_create/update."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Human-readable field name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Field type (string, number, date, reference, etc.)."
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether the field must be supplied per row."
+                },
+                "alternativeTitles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Aliases the auto-mapper recognizes for this field."
+                },
+                "predefinedValues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Closed-vocabulary values, if any."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Get entity field schema",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -184,6 +415,78 @@
           "companyId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mappings": {
+            "type": "array",
+            "description": "Saved field mappings.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Mapping id."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Mapping name."
+                },
+                "entityName": {
+                  "type": "string",
+                  "description": "Entity this mapping targets."
+                },
+                "fields": {
+                  "type": "array",
+                  "description": "Persisted field entries.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "targetFieldId": {
+                        "type": "string",
+                        "description": "Importer field id."
+                      },
+                      "sourceFieldTitle": {
+                        "type": "string",
+                        "description": "CSV column the field reads from."
+                      },
+                      "fixedValue": {
+                        "description": "Constant applied to every row, if not mapped from a column."
+                      }
+                    },
+                    "required": [
+                      "targetFieldId"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "ISO timestamp."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "ISO timestamp."
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "entityName",
+                "fields"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "List saved field mappings",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -237,6 +540,69 @@
           "fields"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Mapping id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Mapping name."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity this mapping targets."
+          },
+          "fields": {
+            "type": "array",
+            "description": "Persisted field entries.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "targetFieldId": {
+                  "type": "string",
+                  "description": "Importer field id."
+                },
+                "sourceFieldTitle": {
+                  "type": "string",
+                  "description": "CSV column the field reads from."
+                },
+                "fixedValue": {
+                  "description": "Constant applied to every row, if not mapped from a column."
+                }
+              },
+              "required": [
+                "targetFieldId"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "entityName",
+          "fields"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Create field mapping",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -295,6 +661,69 @@
           "fields"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Mapping id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Mapping name."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity this mapping targets."
+          },
+          "fields": {
+            "type": "array",
+            "description": "Persisted field entries.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "targetFieldId": {
+                  "type": "string",
+                  "description": "Importer field id."
+                },
+                "sourceFieldTitle": {
+                  "type": "string",
+                  "description": "CSV column the field reads from."
+                },
+                "fixedValue": {
+                  "description": "Constant applied to every row, if not mapped from a column."
+                }
+              },
+              "required": [
+                "targetFieldId"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "entityName",
+          "fields"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Replace existing mapping",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
       }
     },
     {
@@ -317,6 +746,31 @@
           "mappingId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "True if the mapping was deleted."
+          },
+          "mappingId": {
+            "type": "string",
+            "description": "Id of the deleted mapping."
+          }
+        },
+        "required": [
+          "deleted",
+          "mappingId"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Delete saved mapping",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true
       }
     },
     {
@@ -334,6 +788,75 @@
           "companyId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "imports": {
+            "type": "array",
+            "description": "Recent imports.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Import id."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED)."
+                },
+                "entityName": {
+                  "type": "string",
+                  "description": "Entity type being imported."
+                },
+                "fileName": {
+                  "type": "string",
+                  "description": "Uploaded file name."
+                },
+                "summary": {
+                  "type": "object",
+                  "description": "Counts per result type.",
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "succeeded": {
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "type": "integer"
+                    },
+                    "warnings": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "ISO timestamp."
+                },
+                "finishedAt": {
+                  "type": "string",
+                  "description": "ISO timestamp when reached terminal status, if applicable."
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "List recent imports",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -356,6 +879,65 @@
           "importId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED)."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity type being imported."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Uploaded file name."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Counts per result type.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "succeeded": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "warnings": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "ISO timestamp when reached terminal status, if applicable."
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Get import status",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -398,6 +980,68 @@
           "importId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "description": "Per-row results.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rowNumber": {
+                  "type": "integer",
+                  "description": "1-indexed row number in the source file."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "INFO",
+                    "WARNING",
+                    "ERROR"
+                  ]
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable result message."
+                },
+                "createdEntityId": {
+                  "type": "string",
+                  "description": "QBO/Xero entity id created, if any."
+                }
+              },
+              "required": [
+                "rowNumber",
+                "type"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page (1-indexed)."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "Rows per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total result rows across all pages."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total page count."
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Get per-row import results",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -430,6 +1074,66 @@
           "mappingId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED)."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity type being imported."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Uploaded file name."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Counts per result type.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "succeeded": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "warnings": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "ISO timestamp when reached terminal status, if applicable."
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Execute file import with mapping",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -461,6 +1165,47 @@
           "entityName"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Either an import object (dryRun=false) or a proposed mapping with detected columns (dryRun=true).",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id (present when dryRun=false)."
+          },
+          "status": {
+            "type": "string",
+            "description": "Import status (present when dryRun=false)."
+          },
+          "proposedMapping": {
+            "type": "object",
+            "description": "Auto-resolved column\u2192field mapping (present when dryRun=true).",
+            "additionalProperties": true
+          },
+          "detectedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Headers found in the uploaded file (present when dryRun=true)."
+          },
+          "missingRequired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required target fields the auto-mapper could not resolve."
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Auto-map and import a file",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -483,6 +1228,66 @@
           "importId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED)."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity type being imported."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Uploaded file name."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Counts per result type.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "succeeded": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "warnings": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "ISO timestamp when reached terminal status, if applicable."
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Cancel a running import",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true
       }
     },
     {
@@ -505,6 +1310,66 @@
           "importId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status (SCHEDULED, IN_PROGRESS, FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTING, REVERTED)."
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity type being imported."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Uploaded file name."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Counts per result type.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "succeeded": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "warnings": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "ISO timestamp when reached terminal status, if applicable."
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Revert finished import",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true
       }
     },
     {
@@ -533,6 +1398,60 @@
           "importId"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Import id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Either a terminal status (FINISHED, FINISHED_WITH_WARNINGS, FAILED, CANCELED, REVERTED) or 'POLLING' if timeoutSeconds elapsed."
+          },
+          "importId": {
+            "type": "string",
+            "description": "Echoed back when status='POLLING' so the LLM can re-call import_wait."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Per-type result counts on terminal states. Values may be null if the server didn't return totals.",
+            "properties": {
+              "INFO": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "WARNING": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "ERROR": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "lastSeen": {
+            "type": "object",
+            "description": "Last import_status response observed before the timeout, present when status='POLLING'.",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Wait for import to terminate",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -569,6 +1488,65 @@
           "entityName"
         ],
         "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "DRY_RUN",
+              "DONE"
+            ],
+            "description": "DRY_RUN when confirmed=false (first call); DONE when confirmed=true."
+          },
+          "companyId": {
+            "type": "string"
+          },
+          "entityName": {
+            "type": "string"
+          },
+          "importId": {
+            "type": "string",
+            "description": "Present when stage=DONE."
+          },
+          "status": {
+            "type": "string",
+            "description": "Final import status (stage=DONE)."
+          },
+          "proposedMapping": {
+            "type": "object",
+            "description": "Auto-resolved column\u2192field mapping (stage=DRY_RUN).",
+            "additionalProperties": true
+          },
+          "missingRequired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required target fields the auto-mapper could not resolve (stage=DRY_RUN)."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Per-type result counts when stage=DONE and the import reached a terminal state.",
+            "additionalProperties": true
+          },
+          "hint": {
+            "type": "string",
+            "description": "Next-step hint for the LLM."
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "additionalProperties": true
+      },
+      "annotations": {
+        "title": "Happy-path CSV/XLSX importer (dry-run then commit)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
       }
     }
   ]
